@@ -1,0 +1,4 @@
+# Meta interpreter
+
+A meta interpreter is an interpreter for  language written in the language itself. An interpreter is, when it comes to programming languages, a program that can take a source program as input and execute the program generating the expected result. A meta-interpreter is an interpreter for a language written in the language itself (you might think that this is rather pointless since you would still need an interpreter to execute the meta-interpreter  but that is just negative thinking)
+In this assignment you will learn more about functional programming languages as well as practice som Erlang programming.
