@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Scene Scope="Project" version="2">
+    <Scope Scope="Faces Configuration Only"/>
+    <Scope Scope="Project">
+        <Node id="404.xhtml" x="650" y="300" zoom="true"/>
+        <Node id="template/footer.xhtml" x="400" y="300" zoom="true"/>
+        <Node id="error.xhtml" x="150" y="750" zoom="true"/>
+        <Node id="index.xhtml" x="650" y="150" zoom="true"/>
+        <Node id="restore_credentials.xhtml" x="524" y="542" zoom="true"/>
+        <Node id="template/masterTemplate.xhtml" x="400" y="450" zoom="true"/>
+        <Node id="403.xhtml" x="900" y="150" zoom="true"/>
+        <Node id="template/sidebar.xhtml" x="150" y="300" zoom="true"/>
+        <Node id="login.xhtml" x="900" y="300" zoom="true"/>
+        <Node id="applicant/application.xhtml" x="400" y="150" zoom="true"/>
+        <Node id="recruit/recruitment.xhtml" x="150" y="450" zoom="true"/>
+        <Node id="template/header.xhtml" x="150" y="150" zoom="true"/>
+        <Node id="register.xhtml" x="1150" y="150" zoom="true"/>
+    </Scope>
+    <Scope Scope="All Faces Configurations"/>
+</Scene>

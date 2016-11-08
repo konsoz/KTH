@@ -1,0 +1,84 @@
+<ui:composition template="/template/masterTemplate.xhtml"
+    xmlns="http://www.w3.org/1999/xhtml"
+    xmlns:ui="http://java.sun.com/jsf/facelets"
+    xmlns:h="http://xmlns.jcp.org/jsf/html"
+    xmlns:c="http://xmlns.jcp.org/jsp/jstl/core"
+    xmlns:f="http://java.sun.com/jsf/core"
+    xmlns:a="http://xmlns.jcp.org/jsf/passthrough">
+    
+    <ui:define name="title"><h:outputText value="#{msg.title_application}" /></ui:define>
+
+    <ui:define name="content">
+        <h:outputScript library="js" name="validation.js" />
+        <h2><h:outputText value="#{msg.application_apply}" /></h2>
+        <h3><h:outputText value="#{msg.application_available}" /></h3>
+        <h:form>
+            <table border="0" cellspacing="3">
+                <tbody>
+                    <tr>
+                        <td><h:outputLabel for="dateFrom" value="#{msg.application_from}" /></td>
+                        <td>
+                            <h:inputText a:placeholder="#{msg.application_dateformat}" id="dateFrom" styleClass="fromDateText" value="#{applicationManager.newAvailability.fromDate}" label="Date" onblur="validateFromDate();">
+                                <f:convertDateTime pattern="dd-MM-yyyy" />
+                            </h:inputText>
+                        </td>
+                        <td>
+                            <h:outputText styleClass="invalidInput invalidFromDateMessage" value="#{vmsg['invalidDate']}" style="display: none"/>
+                            <h:outputText styleClass="invalidInput emptyFromDateMessage" value="#{vmsg['emptyDate']}" style="display: none"/>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><h:outputLabel for="dateTo" value="#{msg.application_to}" /></td>
+                        <td>
+                            <h:inputText a:placeholder="#{msg.application_dateformat}" id="dateTo" styleClass="toDateText" value="#{applicationManager.newAvailability.toDate}" label="Date" onblur="validateToDate();">
+                                <f:convertDateTime pattern="dd-MM-yyyy"/>
+                            </h:inputText>
+                        </td>
+                        <td>
+                            <h:outputText styleClass="invalidInput invalidToDateMessage" value="#{vmsg['invalidDate']}" style="display: none"/>
+                            <h:outputText styleClass="invalidInput emptyToDateMessage" value="#{vmsg['emptyDate']}" style="display: none"/>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            <p>
+                <h:commandButton value="#{msg.application_add_availability}" action="#{applicationManager.addAvailablity}"/>
+            </p>
+            <p>
+                <h:selectOneListbox size="5" style="width: 20em;">
+                    <f:selectItems value="#{applicationManager.availableRanges}" />
+                </h:selectOneListbox>
+            </p>
+        </h:form>
+        <h3><h:outputText value="#{msg.application_competence}" /></h3>
+        <h:form>
+            <p>
+                <h:selectOneListbox size="5" style="width: 20em;" value="#{applicationManager.selectedCompetence}">
+                    <f:selectItems value="#{applicationManager.getCompetences(localeManager.locale)}" />
+                </h:selectOneListbox>
+            </p>
+            <p>
+                <h:outputLabel for="yearsOfExp" value="#{msg.application_years_of_exp}"/>
+                <h:inputText id="yearsOfExp" style="width: 5em;" value="#{applicationManager.yearsOfExperience}"/>
+            </p>
+            <p>
+                <h:commandButton value="#{msg.application_add_competence}" action="#{applicationManager.addCompetence}"/>
+            </p>
+            <p>
+                <h:messages styleClass="invalidInput" />
+            </p>
+            <c:forEach items="#{applicationManager.hadCompetences}" var="entry">
+                <p>
+                    <h:outputText value="#{entry.key}-#{entry.value}"/>
+                </p>
+            </c:forEach>
+        </h:form>
+        <h:form>
+            <p>
+                <h:commandButton value="#{msg.application_send}" action="#{applicationManager.addApplication}"/>
+            </p>
+        </h:form>
+    </ui:define>
+    
+</ui:composition>
+

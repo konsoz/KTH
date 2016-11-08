@@ -1,0 +1,36 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" 
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:h="http://xmlns.jcp.org/jsf/html"
+      xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+      xmlns:f="http://xmlns.jcp.org/jsf/core">
+    
+    <h:head>
+        <f:view locale="#{localeManager.locale}"/>
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.0/jquery.min.js"></script>
+        <script src="http://ajax.aspnetcdn.com/ajax/jquery.validate/1.14.0/jquery.validate.js"></script>
+	<h:outputStylesheet name="style.css" library="css" />
+        <title><ui:insert name="title" /></title>
+    </h:head>
+    
+    <ui:include src="header.xhtml" />
+    
+    <h:body>
+	<div id="page">
+            <div id="mainContent">
+                <div id="sidebar">
+                    <ui:include src="sidebar.xhtml" />
+                </div>
+
+                <div id="content">
+                    <ui:insert name="content" />
+                </div>
+            </div>
+        </div>
+    </h:body>
+    
+    <ui:include src="footer.xhtml" />
+</html>
+
+    

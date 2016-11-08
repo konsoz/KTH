@@ -1,0 +1,99 @@
+<ui:composition template="/template/masterTemplate.xhtml"
+    xmlns="http://www.w3.org/1999/xhtml"
+    xmlns:ui="http://java.sun.com/jsf/facelets"
+    xmlns:h="http://xmlns.jcp.org/jsf/html">
+    
+    <ui:define name="title"><h:outputText value="#{msg.title_registration}" /></ui:define>
+
+    <ui:define name="content">
+        <h:outputScript library="js" name="validation.js" />
+        <h2><h:outputText value="#{msg.registration_register}" /></h2>
+        <h:form>
+            <table border="0" cellspacing="3">
+                <tbody>
+                    <tr>
+                        <td><h:outputLabel for="name" value="#{msg.registration_name}" /></td>
+                        <td>
+                            <h:inputText id="name" value="#{userManager.newPerson.name}" styleClass="nameText" onblur="validateName();"/>
+                        </td>
+                        <td>
+                            <h:outputText styleClass="invalidInput invalidNameMessage" value="#{vmsg['invalidName']}" style="display: none"/>
+                            <h:outputText styleClass="invalidInput emptyNameMessage" value="#{vmsg['emptyName']}" style="display: none"/>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><h:outputLabel for="surname" value="#{msg.registration_surname}"/></td>
+                        <td>
+                            <h:inputText id="surname" 
+                                         value="#{userManager.newPerson.surname}"
+                                         styleClass="surnameText"
+                                         onblur="validateSurname();"/>
+                        </td>
+                        <td>
+                            <h:outputText styleClass="invalidInput invalidSurnameMessage" value="#{vmsg['invalidSurname']}" style="display: none"/>
+                            <h:outputText styleClass="invalidInput emptySurnameMessage" value="#{vmsg['emptySurname']}" style="display: none"/>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><h:outputLabel for="ssn" value="#{msg.registration_ssn}"/></td>
+                        <td>
+                            <h:inputText id="ssn" 
+                                         value="#{userManager.newPerson.ssn}"
+                                         styleClass="ssnText"
+                                         onblur="validateSSN();"/>
+                        </td>
+                        <td>
+                            <h:outputText styleClass="invalidInput invalidSSNMessage" value="#{vmsg['invalidSSN']}" style="display: none"/>
+                            <h:outputText styleClass="invalidInput emptySSNMessage" value="#{vmsg['emptySSN']}" style="display: none"/>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><h:outputLabel for="mail" value="#{msg.registration_mail}"/></td>
+                        <td>
+                            <h:inputText id="mail" 
+                                         value="#{userManager.newPerson.email}" 
+                                         styleClass="mailText"  
+                                         onblur="validateEmail();"/>
+                        </td>
+                        <td>
+                            <h:outputText styleClass="invalidInput invaldEmailMessage" value="#{vmsg['invalidEmail']}" style="display: none"/>
+                            <h:outputText styleClass="invalidInput emptyEmailMessage" value="#{vmsg['emptyEmail']}" style="display: none"/>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><h:outputLabel for="username" value="#{msg.registration_username}"/></td>
+                        <td>
+                            <h:inputText id="username" 
+                                         value="#{userManager.newPerson.username}"
+                                         styleClass="usernameText"
+                                         onblur="validateUsername();"
+                                         />
+                        </td>
+                        <td>
+                            <h:outputText styleClass="invalidInput invalidUsernameMessage" value="#{vmsg['invalidUsername']}" style="display: none"/>
+                            <h:outputText styleClass="invalidInput emptyUsernameMessage" value="#{vmsg['emptyUsername']}" style="display: none"/>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><h:outputLabel for="password" value="#{msg.registration_password}"/></td>
+                        <td><h:inputSecret id="password" 
+                                           value="#{userManager.newPerson.password}"
+                                           styleClass="passwordText"
+                                           onblur="validatePassword();"/>
+                        </td>
+                        <td>
+                            <h:outputText styleClass="invalidInput invalidPasswordMessage" value="#{vmsg['invalidPassword']}" style="display: none"/>
+                            <h:outputText styleClass="invalidInput emptyPasswordMessage" value="#{vmsg['emptyPassword']}" style="display: none"/>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td></td>
+                        <td align="right"><h:commandButton value="#{msg.registration_registerbutton}" action="#{userManager.register}"/></td>
+                        <td></td>
+                    </tr>
+                </tbody>
+            </table>
+            <h:messages styleClass="invalidInput" />
+        </h:form>
+    </ui:define>
+</ui:composition>

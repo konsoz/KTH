@@ -1,0 +1,17 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ui="http://xmlns.jcp.org/jsf/facelets" xmlns:f="http://java.sun.com/jsf/core" xmlns:h="http://xmlns.jcp.org/jsf/html">
+<h:head></h:head>
+<h:body>
+     
+    <ui:composition>
+        <div id="sidenav">
+            <p><h:outputLink value="#{request.contextPath}/index.xhtml"><h:outputText value="#{msg.sidebar_home}" /></h:outputLink></p>
+            <p><h:outputLink value="#{request.contextPath}/register.xhtml"><h:outputText value="#{msg.sidebar_register}" /></h:outputLink></p>
+            <p><h:outputLink value="#{request.contextPath}/login.xhtml"><h:outputText value="#{msg.sidebar_login}" /></h:outputLink></p>
+            <p><h:outputLink value="#{request.contextPath}/applicant/application.xhtml"><h:outputText value="#{msg.sidebar_apply}" /></h:outputLink></p>
+        </div>
+    </ui:composition>
+     
+</h:body>
+</html>

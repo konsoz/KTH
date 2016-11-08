@@ -1,0 +1,46 @@
+#header {
+    background-color: black;
+    color: white;
+    text-align: center;
+    padding: 5px;
+}
+
+#mainContent {
+    display: table;
+    float: left;
+}
+
+#sidebar, #content {
+    display: table-cell;
+}
+
+#sidebar {
+    line-height: 30px;
+    background-color: #eeeeee;
+    width: 10%;
+    padding: 10px;
+}
+
+#content {
+    width: 90%;
+    padding: 10px;
+}
+
+#footer {
+    background-color: orange;
+    float: left;
+    height: 100px;
+    width: 100%;
+}
+
+#languageSelection {
+    float: right;
+}
+
+#loggedIn {
+    float: left;
+}
+
+.invalidInput {
+    color:red;
+}

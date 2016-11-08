@@ -1,0 +1,43 @@
+<ui:composition template="/template/masterTemplate.xhtml"
+    xmlns="http://www.w3.org/1999/xhtml"
+    xmlns:ui="http://java.sun.com/jsf/facelets"
+    xmlns:h="http://xmlns.jcp.org/jsf/html"
+    xmlns:c="http://xmlns.jcp.org/jsp/jstl/core">
+    
+    <ui:define name="title"><h:outputText value="#{msg.title_login}" /></ui:define>
+
+    <ui:define name="content">
+        <h2><h:outputText value="#{msg.login_login}"/></h2>
+        <c:choose>
+            <c:when test="#{userManager.isLoggedIn}">
+                <h3><h:outputText value="#{msg.login_logged_in_as}#{userManager.currentUser.name} #{userManager.currentUser.surname}" /></h3>
+                <p><h:outputText value="#{userManager.currentUser.roleId.getLocalizedName(localeManager.locale)}" /></p>
+            </c:when>
+            <c:otherwise>
+                <h:outputText styleClass="invalidInput" rendered="#{param.loginFailed == 1}" value="#{msg.login_error}"/>
+                <h:outputText styleClass="invalidInput" rendered="#{param.registered == 1}" value="#{msg.login_register_success}"/>
+                <form method="POST" action="j_security_check">
+                    <table border="0" cellspacing="3">
+                        <tbody>
+                            <tr>
+                                <td><h:outputLabel value="#{msg.login_username}"/></td>
+                                <td><input id="username" type="text" name="j_username" /></td>
+                            </tr>
+                            <tr>
+                                <td><h:outputLabel value="#{msg.login_password}"/></td>
+                                <td><input id="password" type="password" name="j_password" /></td>
+                            </tr>
+                            <tr>
+                                <td></td>
+                                <td align="right"><input type="submit" value="#{msg.login_button}" /></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </form>
+                <p><h:link value="#{msg.sidebar_forgot_credentials}" outcome="restore_credentials"/></p>
+            </c:otherwise>
+        </c:choose>
+    </ui:define>
+    
+</ui:composition>
+
