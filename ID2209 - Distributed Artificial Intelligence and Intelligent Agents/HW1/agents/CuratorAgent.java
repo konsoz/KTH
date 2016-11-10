@@ -35,7 +35,8 @@ public class CuratorAgent extends Agent {
 		// Create art collection
 		
 		SequentialBehaviour sequentialBehaviour = new SequentialBehaviour();
-
+		
+		// Just to meet homework requirements...
 		sequentialBehaviour.addSubBehaviour(new OneShotBehaviour() {
 			
 			@Override
@@ -49,14 +50,16 @@ public class CuratorAgent extends Agent {
 			}
 		});
 		
+		// Create parallel behavior for getting a tour and retrieving tour artifacts
+		// it terminates when a particular condition on its sub-behaviours is met 
+		// i.e. when all children are done, N children are done or any child is done.
+		
 		ParallelBehaviour parallelBehaviour = new ParallelBehaviour();
+		MessageTemplate tourTemplate = MessageTemplate.MatchOntology(ReqOntology.REQUEST_BUILD_TOUR);
+		MessageTemplate tourDetailsTemplate = MessageTemplate.MatchOntology(ReqOntology.REQUEST_ARTIFACT_INFO);
 		
-		//Add responder behaviours for building a tour and getting artifact details.
-		MessageTemplate buildTourTemplate = MessageTemplate.MatchOntology(ReqOntology.REQUEST_BUILD_TOUR);
-		MessageTemplate requestTourDetailsTemplate = MessageTemplate.MatchOntology(ReqOntology.REQUEST_ARTIFACT_INFO);
-		
-		parallelBehaviour.addSubBehaviour(new BuildTourResponder(this, buildTourTemplate));
-		parallelBehaviour.addSubBehaviour(new TourDetailsResponder(this, requestTourDetailsTemplate));
+		parallelBehaviour.addSubBehaviour(new TourResponder(this, tourTemplate));
+		parallelBehaviour.addSubBehaviour(new TourDetailsResponder(this, tourDetailsTemplate));
 		
 		sequentialBehaviour.addSubBehaviour(parallelBehaviour);
 		
@@ -80,6 +83,13 @@ public class CuratorAgent extends Agent {
 		}
 	}
 	
+	/**
+	 * 
+	 * Get tour ids based on user's gender and age
+	 * 
+	 * @param user
+	 * @return tour ids
+	 */
 	private ArrayList<Long> getTourForUser(User user){
 		
 		ArrayList<Long> idsToDeliver = new ArrayList<>();
@@ -94,6 +104,13 @@ public class CuratorAgent extends Agent {
 		return idsToDeliver;
 	}
 	
+	/**
+	 * 
+	 * Get artifacts description based on artifact id
+	 * 
+	 * @param ids
+	 * @return artifacts
+	 */
 	private ArrayList<Artifact> getArtifactsWithIds(ArrayList<Long> ids){
 		ArrayList<Artifact> artifactsToDeliver = new ArrayList<>();
 		for (Long id : ids) {
@@ -105,14 +122,20 @@ public class CuratorAgent extends Agent {
 		return artifactsToDeliver;
 	}
 	
-	
-	class BuildTourResponder extends SimpleAchieveREResponder {
+	/**
+	 * 
+	 * Get tour build request from guide and reply with artifact ids
+	 * 
+	 * @author konstantin
+	 *
+	 */
+	class TourResponder extends SimpleAchieveREResponder {
 
-		public BuildTourResponder(Agent a, MessageTemplate mt) {
+		public TourResponder(Agent a, MessageTemplate mt) {
 			super(a, mt);
 		}
 
-		
+		// Must override otherwise getting error message (?)
 		@Override
 		protected ACLMessage prepareResponse(ACLMessage request){
 			return null;
@@ -121,25 +144,32 @@ public class CuratorAgent extends Agent {
 		@Override
 		protected ACLMessage prepareResultNotification(ACLMessage request,
 				ACLMessage response) throws FailureException {
-			System.out.println("Curator received build tour request from guide"); 
+			System.out.println("Curator received build tour request from guide..."); 
 
-			ACLMessage informDone = request.createReply();
-			informDone.setPerformative(ACLMessage.INFORM);
+			ACLMessage reply = request.createReply();
+			reply.setPerformative(ACLMessage.INFORM);
 			
 			try {
 				User user = (User) request.getContentObject();
 				ArrayList<Long> ids = getTourForUser(user);
-				informDone.setContentObject(ids);
+				reply.setContentObject(ids);
 			} 
 			catch (IOException | UnreadableException e) {
 				e.printStackTrace();
 			}
 			
-			return informDone;
+			return reply;
 		}
 	}
 
-	
+	/**
+	 * 
+	 * 
+	 * Wait for tour details request from profiler and build artifact list based on artifact ids
+	 * 
+	 * @author konstantin
+	 *
+	 */
 	class TourDetailsResponder extends SimpleAchieveREResponder {
 
 		public TourDetailsResponder(Agent a, MessageTemplate mt) {
@@ -154,22 +184,22 @@ public class CuratorAgent extends Agent {
 		@Override
 		protected ACLMessage prepareResultNotification(ACLMessage request,
 				ACLMessage response) throws FailureException {
-			System.out.println("Curator received tour details request from profiler"); 
+			System.out.println("Curator received tour details request from profiler..."); 
 			
-			ACLMessage informDone = request.createReply();
-			informDone.setPerformative(ACLMessage.INFORM);
+			ACLMessage reply = request.createReply();
+			reply.setPerformative(ACLMessage.INFORM);
 			
 			try {
 				@SuppressWarnings("unchecked")
 				ArrayList<Long> ids = (ArrayList<Long>) request.getContentObject();
 				ArrayList<Artifact> artifacts = getArtifactsWithIds(ids);
-				informDone.setContentObject(artifacts);
+				reply.setContentObject(artifacts);
 			} 
 			catch (IOException | UnreadableException e) {
 				e.printStackTrace();
 			}
 			
-			return informDone;
+			return reply;
 		}
 	}
 }

@@ -12,10 +12,12 @@ import jade.domain.DFService;
 import jade.domain.FIPAException;
 import jade.domain.FIPANames;
 import jade.domain.FIPAAgentManagement.DFAgentDescription;
+import jade.domain.FIPAAgentManagement.SearchConstraints;
 import jade.domain.FIPAAgentManagement.ServiceDescription;
 import jade.lang.acl.ACLMessage;
 import jade.lang.acl.UnreadableException;
 import jade.proto.SimpleAchieveREInitiator;
+import jade.proto.SubscriptionInitiator;
 import models.Artifact;
 import models.ReqOntology;
 import models.User;
@@ -23,30 +25,32 @@ import models.User;
 public class ProfilerAgent extends Agent {
 
 	private User user;
-	
+
 	private AID curator;
 	private AID tourGuide;
-	private ArrayList <Long> artifactIDs;
-	private ArrayList <Artifact> artifactsToVisit;
-	
+	private ArrayList<Long> artifactIDs;
+	private ArrayList<Artifact> artifactsToVisit;
+
 	@Override
-	protected void setup(){
-		
-		System.out.println("Profiler Agent "+getAID().getName()+" is ready");
-		
+	protected void setup() {
+
+		System.out.println("Profiler Agent " + getAID().getName() + " is ready");
+
 		artifactIDs = new ArrayList<>();
 		artifactsToVisit = new ArrayList<>();
-		
+
 		// Create a random user
-		
+
 		user = new User();
-		
+
 		// Print user for debugg
-		
+
 		System.err.println("User: " + user.getAge() + " " + user.getGender());
+
+		addSubscription();
 		
 		// Find curator and tourguide agents
-			
+
 		addBehaviour(new TickerBehaviour(this, 60000) {
 			private static final long serialVersionUID = 1L;
 
@@ -55,85 +59,134 @@ public class ProfilerAgent extends Agent {
 				curator = findCurator();
 				tourGuide = findTourGuide();
 				System.out.println("Profiler Agent tries to get a tour...");
-				
 				getTour();
-				
-				
-				
-				
+
 			}
-		} );
-		
-		
+		});
+
 	}
-	
-	
+
+	/**
+	 * 
+	 * Subscription for new guide services
+	 * 
+	 */
+	@SuppressWarnings("serial")
+	private void addSubscription() {
+		DFAgentDescription template = new DFAgentDescription();
+		ServiceDescription description = new ServiceDescription();
+		description.setType("guide");
+
+		SearchConstraints constrains = new SearchConstraints();
+		constrains.setMaxResults((long) 1);
+
+		addBehaviour(new SubscriptionInitiator(this,
+				DFService.createSubscriptionMessage(this, getDefaultDF(), template, constrains)) {
+
+			@Override
+			protected void handleInform(ACLMessage inform) {
+				super.handleInform(inform);
+				try {
+					DFAgentDescription[] resultAgentDescriptions = DFService.decodeNotification(inform.getContent());
+					if (resultAgentDescriptions.length > 0) {
+						tourGuide = findTourGuide();
+					}
+				} catch (FIPAException e) {
+					e.printStackTrace();
+				}
+			}
+		});
+	}
+
+	/**
+	 * 
+	 * Build a tour and request info about artifacts
+	 * 
+	 */
 	private void getTour() {
-		
+
 		// Create request message for tour
-		ACLMessage requestTourMessage = new ACLMessage(ACLMessage.REQUEST);
-		requestTourMessage.setProtocol(FIPANames.InteractionProtocol.FIPA_REQUEST); 
-		requestTourMessage.addReceiver(tourGuide);
+		ACLMessage reqMsg = new ACLMessage(ACLMessage.REQUEST);
+		reqMsg.setProtocol(FIPANames.InteractionProtocol.FIPA_REQUEST);
+		reqMsg.addReceiver(tourGuide);
 
 		try {
-			requestTourMessage.setContentObject(user);
+			reqMsg.setContentObject(user);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 
-		requestTourMessage.setOntology(ReqOntology.REQUEST_TOUR);
-		RequestTourInitiator requestTourGuideBehaviour = new RequestTourInitiator(this, requestTourMessage);
+		reqMsg.setOntology(ReqOntology.REQUEST_TOUR);
+		TourInitiator requestTourGuideBehaviour = new TourInitiator(this, reqMsg);
 
-		//Request artifact details from the curator.
-		ACLMessage requestTourDetailsMessage = new ACLMessage(ACLMessage.REQUEST);
-		requestTourDetailsMessage.setProtocol(FIPANames.InteractionProtocol.FIPA_REQUEST); 
-		requestTourDetailsMessage.addReceiver(curator);
-		requestTourDetailsMessage.setOntology(ReqOntology.REQUEST_ARTIFACT_INFO);
-		TourDetailsInitiator requestTourDetailsBehaviour = new TourDetailsInitiator(this, requestTourDetailsMessage);
-
-		//These two behaviors should be executed sequentially,
-		//requesting the tour first and then the artifact details.
+		// Get tour first and then information about artifacts
 		SequentialBehaviour sequentialBehaviour = new SequentialBehaviour();
 		sequentialBehaviour.addSubBehaviour(requestTourGuideBehaviour);
-		sequentialBehaviour.addSubBehaviour(requestTourDetailsBehaviour);
+		sequentialBehaviour.addSubBehaviour(reqArtifacts());
 		addBehaviour(sequentialBehaviour);
 	}
-	
-	
-	private AID findCurator(){
+
+	/**
+	 * 
+	 * Request for artifacts
+	 * 
+	 * @return
+	 */
+	private TourDetailsInitiator reqArtifacts() {
+		// Request artifact details from the curator.
+
+		ACLMessage reqMsg = new ACLMessage(ACLMessage.REQUEST);
+		reqMsg.setProtocol(FIPANames.InteractionProtocol.FIPA_REQUEST);
+		reqMsg.addReceiver(curator);
+		reqMsg.setOntology(ReqOntology.REQUEST_ARTIFACT_INFO);
+		TourDetailsInitiator requestTourDetailsBehaviour = new TourDetailsInitiator(this, reqMsg);
+		return requestTourDetailsBehaviour;
+	}
+
+	/**
+	 * 
+	 * Find curator AID from DF Agent
+	 * 
+	 * @return curator AID
+	 */
+	private AID findCurator() {
 		DFAgentDescription description = new DFAgentDescription();
 		ServiceDescription serviceDescription = new ServiceDescription();
 		serviceDescription.setType("curator");
 		description.addServices(serviceDescription);
 		try {
-			DFAgentDescription[] resultAgentDescriptions = DFService.search(this,  description);
+			DFAgentDescription[] resultAgentDescriptions = DFService.search(this, description);
 			if (resultAgentDescriptions.length > 0) {
 				return resultAgentDescriptions[0].getName();
 			}
-		} 
-		catch (FIPAException e) {
+		} catch (FIPAException e) {
 			e.printStackTrace();
 		}
 		return null;
 	}
-	
-	private AID findTourGuide(){
+
+	/**
+	 * 
+	 * Find tour guide AID from DF Agent
+	 * 
+	 * @return
+	 */
+	private AID findTourGuide() {
 		DFAgentDescription description = new DFAgentDescription();
 		ServiceDescription serviceDescription = new ServiceDescription();
 		serviceDescription.setType("guide");
 		description.addServices(serviceDescription);
 		try {
-			DFAgentDescription[] resultAgentDescriptions = DFService.search(this,  description);
+			DFAgentDescription[] resultAgentDescriptions = DFService.search(this, description);
 			if (resultAgentDescriptions.length > 0) {
 				return resultAgentDescriptions[0].getName();
 			}
-		} 
-		catch (FIPAException e) {
+		} catch (FIPAException e) {
 			e.printStackTrace();
 		}
 		return null;
 	}
-	
+
 	/**
 	 * 
 	 * 
@@ -142,9 +195,9 @@ public class ProfilerAgent extends Agent {
 	 * @author konstantin
 	 *
 	 */
-	class RequestTourInitiator extends SimpleAchieveREInitiator {
+	class TourInitiator extends SimpleAchieveREInitiator {
 
-		public RequestTourInitiator(Agent a, ACLMessage msg) {
+		public TourInitiator(Agent a, ACLMessage msg) {
 			super(a, msg);
 		}
 
@@ -152,17 +205,24 @@ public class ProfilerAgent extends Agent {
 		@Override
 		protected void handleInform(ACLMessage msg) {
 			super.handleInform(msg);
-			System.out.println("Profiler received tour response from guide");
+			System.out.println("Profiler received tour response from guide...");
 
 			try {
 				artifactIDs = (ArrayList<Long>) msg.getContentObject();
-			} 
-			catch (UnreadableException e) {
+			} catch (UnreadableException e) {
 				e.printStackTrace();
 			}
 		}
 	}
-	
+
+	/**
+	 * 
+	 * 
+	 * Send a request for retrieving info about artifacts
+	 * 
+	 * @author konstantin
+	 *
+	 */
 	class TourDetailsInitiator extends SimpleAchieveREInitiator {
 
 		public TourDetailsInitiator(Agent a, ACLMessage msg) {
@@ -173,8 +233,7 @@ public class ProfilerAgent extends Agent {
 		protected ACLMessage prepareRequest(ACLMessage msg) {
 			try {
 				msg.setContentObject(artifactIDs);
-			} 
-			catch (IOException e) {
+			} catch (IOException e) {
 				e.printStackTrace();
 			}
 
@@ -185,21 +244,18 @@ public class ProfilerAgent extends Agent {
 		@Override
 		protected void handleInform(ACLMessage msg) {
 			super.handleInform(msg);
-			
-			
+
 			try {
 				artifactsToVisit = (ArrayList<Artifact>) msg.getContentObject();
-				
+
 				System.out.println("Tour with following artifacts is provided by tour and curator agents: ");
-				
+
 				for (Artifact artifact : artifactsToVisit) {
-					System.out.println(artifact.getId()+" " + artifact.getGenre() +
-							" for following gender " + artifact.getMoreInterestingFor()
-							+ " age range " + artifact.getMoreInterestingAge());
+					System.out.println(artifact.getId() + " " + artifact.getGenre() + " for following gender "
+							+ artifact.getMoreInterestingFor() + " age range " + artifact.getMoreInterestingAge());
 				}
-				
-			} 
-			catch (UnreadableException e) {
+
+			} catch (UnreadableException e) {
 				e.printStackTrace();
 			}
 		}

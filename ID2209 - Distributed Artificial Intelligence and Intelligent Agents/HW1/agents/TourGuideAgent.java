@@ -25,16 +25,23 @@ public class TourGuideAgent extends Agent {
 		
 		System.out.println("Tour Guide Agent "+getAID().getName()+" is ready");
 		
-		
+		// Find curator
 		curator = findCurator();
 		
+		// Register ourself
 		register();
 		
+		// Wait for a message from profiler
 		addMsgReceiver();
 		
 	}
 	
-	
+	/**
+	 * 
+	 * Find curator from DF agent
+	 * 
+	 * @return curator AID
+	 */
 	private AID findCurator(){
 		DFAgentDescription description = new DFAgentDescription();
 		ServiceDescription serviceDescription = new ServiceDescription();
@@ -52,16 +59,19 @@ public class TourGuideAgent extends Agent {
 		return null;
 	}
 	
-	
+	/**
+	 * 
+	 * Add receiving behavior to the tour guide
+	 * 
+	 */
 	private void addMsgReceiver() {
-		//Receiving requests for tour from profiler
-		MessageTemplate tourRequestMessageTemplate = MessageTemplate.MatchOntology(ReqOntology.REQUEST_TOUR);
-		addBehaviour(new MsgReceiver(this, tourRequestMessageTemplate, Long.MAX_VALUE, null, null) {
+		MessageTemplate template = MessageTemplate.MatchOntology(ReqOntology.REQUEST_TOUR);
+		addBehaviour(new MsgReceiver(this, template, Long.MAX_VALUE, null, null) {
 			
 			@Override
 			protected void handleMessage(ACLMessage msg) {
 				super.handleMessage(msg);
-				System.out.println("Guide received tour request from profiler");
+				System.out.println("Guide received tour request from profiler...");
 				
 				//Requests the curator to build a tour
 				ACLMessage message = new ACLMessage(ACLMessage.REQUEST);
@@ -81,7 +91,6 @@ public class TourGuideAgent extends Agent {
 			
 			@Override
 			public int onEnd() {
-				//Re-add MsgReceiver
 				addMsgReceiver();
 				return super.onEnd();
 			}
@@ -103,7 +112,13 @@ public class TourGuideAgent extends Agent {
 		}
 	}
 	
-	
+	/**
+	 * 
+	 * Build a tour with help of curator agent and send reply back to profiler
+	 * 
+	 * @author konstantin
+	 *
+	 */
 	class BuildTourInitiator extends SimpleAchieveREInitiator {
 		ACLMessage original;
 		
@@ -115,9 +130,9 @@ public class TourGuideAgent extends Agent {
 		@Override
 		protected void handleInform(ACLMessage msg) {
 			super.handleInform(msg);
-			System.out.println("Guide received tour built from curator");
+			System.out.println("Guide received tour built from curator...");
 
-			//Sending response back to profiler
+			
 			ACLMessage reply = original.createReply();
 			reply.setPerformative(ACLMessage.INFORM);
 			
