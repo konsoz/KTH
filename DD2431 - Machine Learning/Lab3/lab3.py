@@ -35,7 +35,7 @@ import random
 # NOTE: you do not need to handle the W argument for this part!
 # in: labels - N vector of class labels
 # out: prior - C x 1 vector of class priors
-def computePrior(labels, W=None):
+def computePrior(labels, W):
     Npts = labels.shape[0]
     if W is None:
         W = np.ones((Npts,1))/Npts
@@ -48,8 +48,10 @@ def computePrior(labels, W=None):
 
     classes = np.unique(labels)
 
-    for i in range(len(classes)):
-        count = (labels == i).sum()
+    for i,clazz in enumerate(classes):
+        idx = np.where(labels==clazz)[0]
+        wlc = W[idx,:]
+        count = wlc.sum()
         prior[i] = float(count)/len(labels)        
 
     return prior
@@ -59,7 +61,7 @@ def computePrior(labels, W=None):
 #     labels - N vector of class labels
 # out:    mu - C x d matrix of class means (mu[i] - class i mean)
 #      sigma - C x d x d matrix of class covariances (sigma[i] - class i sigma)
-def mlParams(X, labels, W=None):
+def mlParams(X, labels, W):
     assert(X.shape[0]==labels.shape[0])
     Npts,Ndims = np.shape(X)
     classes = np.unique(labels)
@@ -74,26 +76,25 @@ def mlParams(X, labels, W=None):
     classes = np.unique(labels) # Get the unique examples
     # Iterate over both index and value
     for idx,clazz in enumerate(classes):
-        ix = idx
-        idx = labels==clazz # Returns a true or false with the length of y
         # Or more compactly extract the indices for which y==class is true,
         # analogous to MATLAB’s find
         idx = np.where(labels==clazz)[0]
         xlc = X[idx,:] # Get the x for the class labels. Vectors are rows.
+        wlc = W[idx,:] # Get the w for the class labels
         index = 0
-        for column in xlc.T:
-            mean = np.mean(column)
+        for r in xlc.T:
+            mean = (r.dot(wlc))/wlc.sum()
             mu[clazz,index] = mean
             index += 1
 
     for k in range(len(classes)):
-        n_sum = 0
+        w_sum = 0
         for ni in range(len(labels)):
             if labels[ni] == k:
-                n_sum += 1
-                subtracted = X[ni] - mu[k]
-                sigma[k,:,:] += subtracted.reshape(-1,1)*subtracted
-        sigma[k,:,:] /= n_sum
+                w_sum += W[ni]
+                subtracted = (X[ni] - mu[k])
+                sigma[k,:,:] += W[ni]*(subtracted.reshape(-1,1)*subtracted)
+        sigma[k,:,:] /= w_sum
 
     return mu, sigma
 
@@ -161,15 +162,15 @@ class BayesClassifier(object):
 # Call the `testClassifier` and `plotBoundary` functions for this part.
 
 
-testClassifier(BayesClassifier(), dataset='iris', split=0.7)
+#testClassifier(BayesClassifier(), dataset='iris', split=0.7)
 
 
 
-testClassifier(BayesClassifier(), dataset='vowel', split=0.7)
+#testClassifier(BayesClassifier(), dataset='vowel', split=0.7)
 
 
 
-plotBoundary(BayesClassifier(), dataset='iris',split=0.7)
+#plotBoundary(BayesClassifier(), dataset='iris',split=0.7)
 
 
 # ## Boosting functions to implement
@@ -184,6 +185,11 @@ plotBoundary(BayesClassifier(), dataset='iris',split=0.7)
 # out:    classifiers - (maximum) length T Python list of trained classifiers
 #              alphas - (maximum) length T Python list of vote weights
 def trainBoost(base_classifier, X, labels, T=10):
+    def delta(h, c):
+        #h is the class that we predict
+        #c is the correct class
+        return h == c
+
     # these will come in handy later on
     Npts,Ndims = np.shape(X)
 
@@ -201,9 +207,26 @@ def trainBoost(base_classifier, X, labels, T=10):
         vote = classifiers[-1].classify(X)
 
         # TODO: Fill in the rest, construct the alphas etc.
-        # ==========================
+        deltas = (delta(vote, labels) != True).reshape(1, -1)
+
+        error = deltas.dot(wCur)[0][0]
+        print(error)
         
-        # alphas.append(alpha) # you will need to append the new alpha
+        alpha = 0.5*( np.log(1-error)-np.log(error) )
+
+        for i in range(len(X)):
+            pred_X = vote[i]
+            if(pred_X == True):
+                multiplier = np.exp(-alpha)
+            else:
+                multiplier = np.exp(alpha)
+
+            wCur[i] = wCur[i]*multiplier
+
+        #normalizes
+        wCur /= wCur.sum()
+        
+        alphas.append(alpha) # you will need to append the new alpha
         # ==========================
         
     return classifiers, alphas
@@ -214,6 +237,11 @@ def trainBoost(base_classifier, X, labels, T=10):
 #    Nclasses - the number of different classes
 # out:  yPred - N vector of class predictions for test points
 def classifyBoost(X, classifiers, alphas, Nclasses):
+    def delta(h, c):
+        #h is the class that we predict
+        #c is the correct class
+        return h == c
+
     Npts = X.shape[0]
     Ncomps = len(classifiers)
 
@@ -226,7 +254,20 @@ def classifyBoost(X, classifiers, alphas, Nclasses):
         # TODO: implement classificiation when we have trained several classifiers!
         # here we can do it by filling in the votes vector with weighted votes
         # ==========================
-        
+        """for classifier in classifiers:
+            votes = classifiers[0].classify(X)
+
+
+        classes = np.unique(labels)
+        H = []
+        for idx,clazz in enumerate(classes):
+            idx = np.where(labels==clazz)[0]
+
+            deltas = (delta(vote, labels[idx])).reshape(1, -1)
+            H_c = alpha.dot(deltas)
+
+            H.append(H_c)
+        """
         # ==========================
 
         # one way to compute yPred after accumulating the votes
@@ -259,7 +300,7 @@ class BoostClassifier(object):
 # Call the `testClassifier` and `plotBoundary` functions for this part.
 
 
-#testClassifier(BoostClassifier(BayesClassifier(), T=10), dataset='iris',split=0.7)
+testClassifier(BoostClassifier(BayesClassifier(), T=10), dataset='iris',split=0.7)
 
 
 
