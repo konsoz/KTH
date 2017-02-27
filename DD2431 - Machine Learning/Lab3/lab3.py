@@ -46,10 +46,11 @@ def computePrior(labels, W=None):
 
     prior = np.zeros((Nclasses,1))
 
-    # TODO: compute the values of prior for each class!
-    # ==========================
-    
-    # ==========================
+    classes = np.unique(labels)
+
+    for i in range(len(classes)):
+        count = (labels == i).sum()
+        prior[i] = float(count)/len(labels)        
 
     return prior
 
@@ -107,11 +108,21 @@ def classifyBayes(X, prior, mu, sigma):
     Nclasses,Ndims = np.shape(mu)
     logProb = np.zeros((Nclasses, Npts))
 
-    # TODO: fill in the code to compute the log posterior logProb!
-    # ==========================
-    
-    # ==========================
-    
+    for x_idx in range(Npts):
+        x_star = X[x_idx]
+        for k in range(Nclasses):
+            sigma_k = sigma[k]
+            mu_k = mu[k]
+            prior_k = prior[k]
+            first_term = -0.5*(np.log(np.linalg.det(sigma_k)))
+            second_term_1 = 0.5*(x_star - mu_k).reshape(1,-1)
+            second_term_2 = np.linalg.inv(sigma_k)
+            second_term_3 = ((x_star-mu_k).reshape(-1,1))
+            second_term = second_term_1.dot((second_term_2.dot(second_term_3)))
+            third_term = np.log(prior_k)
+            discriminant = (first_term-second_term+third_term)[0][0]
+            logProb[k,x_idx] = discriminant 
+
     # one possible way of finding max a-posteriori once
     # you have computed the log posterior
     h = np.argmax(logProb,axis=0)
@@ -142,23 +153,23 @@ class BayesClassifier(object):
 # Call `genBlobs` and `plotGaussian` to verify your estimates.
 
 
-X, labels = genBlobs(centers=5)
-mu, sigma = mlParams(X,labels)
-plotGaussian(X,labels,mu,sigma)
+#X, labels = genBlobs(centers=5)
+#mu, sigma = mlParams(X,labels)
+#plotGaussian(X,labels,mu,sigma)
 
 
 # Call the `testClassifier` and `plotBoundary` functions for this part.
 
 
-#testClassifier(BayesClassifier(), dataset='iris', split=0.7)
+testClassifier(BayesClassifier(), dataset='iris', split=0.7)
 
 
 
-#testClassifier(BayesClassifier(), dataset='vowel', split=0.7)
+testClassifier(BayesClassifier(), dataset='vowel', split=0.7)
 
 
 
-#plotBoundary(BayesClassifier(), dataset='iris',split=0.7)
+plotBoundary(BayesClassifier(), dataset='iris',split=0.7)
 
 
 # ## Boosting functions to implement
