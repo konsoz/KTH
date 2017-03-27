@@ -6,6 +6,7 @@ import math as math
 import scipy.signal as scipysignal
 import matplotlib.pyplot as plt
 from scipy.fftpack import fft, fftshift
+from scipy.fftpack.realtransforms import dct
 
 EXAMPLE = np.load('example.npz')['example'].item()
 
@@ -157,20 +158,18 @@ def logMelSpectrum(spectrum, samplingrate,trfbank):
     
     log_mel_spectrum = np.zeros((spectrum.shape[0],mel_filter_bank.shape[0]))
 
-    print(spectrum.shape)
-    print(mel_filter_bank.shape)
-    print(log_mel_spectrum.shape)
-    print(EXAMPLE.get('mspec').shape)
-
-
     for i in range(0,spectrum.shape[0]):
-        log_mel_spectrum[i] = np.log(spectrum[i]*mel_filter_bank[i])
+        log_mel_spectrum[i] = (np.matrix(spectrum[i])*mel_filter_bank.T)
+        
+    log_mel_spectrum = np.log(log_mel_spectrum)
+
+    return log_mel_spectrum
 
     #plt.imshow(log_mel_spectrum,origin='lower',interpolation='nearest',aspect='auto')
     #plt.show()
 
 
-def cepstrum(input, nceps):
+def cepstrum(mspec, nceps):
     """
     Calulates Cepstral coefficients from mel spectrum applying Discrete Cosine Transform
 
@@ -182,6 +181,8 @@ def cepstrum(input, nceps):
         array of Cepstral coefficients [N x nceps]
     Note: you can use the function dct from scipy.fftpack.realtransforms
     """
+    coefficients = dct(mspec,norm='ortho')
+    return coefficients[:,:nceps]
 
 def dtw(localdist):
     """Dynamic Time Warping.

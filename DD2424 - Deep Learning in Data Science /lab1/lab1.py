@@ -111,6 +111,9 @@ def compute_gradients():
 [X,Y,y] = load_batch()
 [W,b] = init_model(X.shape[0])
 
+print(W)
+print(b)
+
 P = evaluate_classifier(X,W,b)
 
 #cost = compute_cost(X,Y,P,W)

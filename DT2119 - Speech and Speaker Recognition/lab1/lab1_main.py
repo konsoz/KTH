@@ -19,15 +19,13 @@ def mfcc(samples, winlen = 400, winshift = 200, nfft=512, nceps=13, samplingrate
         N x nceps array with lifetered MFCC coefficients
     """
 
-    
-
     frames = pr.enframe(samples, 20, 10,samplingrate)
     preemph = pr.preemp(frames, 0.97)
     windowed = pr.windowing(preemph)
     spec = pr.powerSpectrum(windowed, nfft)
     mspec = pr.logMelSpectrum(spec, samplingrate,trfbank)
-    #ceps = cepstrum(mspec, nceps)
-    #return lifter(ceps, liftercoeff)
+    ceps = pr.cepstrum(mspec, nceps)
+    return lifter(ceps, liftercoeff)
 
 def tidigit2labels(tidigitsarray):
     """
@@ -131,4 +129,14 @@ def trfbank(fs, nfft, lowfreq=133.33, linsc=200/3., logsc=1.0711703, nlinfilt=13
 tidigits = np.load('tidigits.npz')['tidigits']
 example = np.load('example.npz')['example'].item()
 
-mfcc(example.get('samples'))
+all_frames = np.array(tidigits[0].get('samples'))
+
+for i in range(1,tidigits.size):
+    all_frames = np.concatenate((all_frames,tidigits[i].get('samples'))) 
+
+
+features = mfcc(all_frames)
+
+#for i in range(2,3):
+    #feature = features[:,:i]
+    #print(np.corrcoef(feature))
