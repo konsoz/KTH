@@ -1,5 +1,9 @@
 import numpy as np
-import proto as pr
+import lab1_tools as tools
+import matplotlib.pyplot as plt
+from scipy.cluster.hierarchy import linkage,dendrogram
+from sklearn import mixture
+from matplotlib.colors import LogNorm
 # DT2118, Lab 1 Feature Extraction
 # - Functions given by the exercise -------------------------------------------- 
 
@@ -19,12 +23,12 @@ def mfcc(samples, winlen = 400, winshift = 200, nfft=512, nceps=13, samplingrate
         N x nceps array with lifetered MFCC coefficients
     """
 
-    frames = pr.enframe(samples, 20, 10,samplingrate)
-    preemph = pr.preemp(frames, 0.97)
-    windowed = pr.windowing(preemph)
-    spec = pr.powerSpectrum(windowed, nfft)
-    mspec = pr.logMelSpectrum(spec, samplingrate,trfbank)
-    ceps = pr.cepstrum(mspec, nceps)
+    frames = tools.enframe(samples, 20, 10,samplingrate)
+    preemph = tools.preemp(frames, 0.97)
+    windowed = tools.windowing(preemph)
+    spec = tools.powerSpectrum(windowed, nfft)
+    mspec = tools.logMelSpectrum(spec, samplingrate,trfbank)
+    ceps = tools.cepstrum(mspec, nceps)
     return lifter(ceps, liftercoeff)
 
 def tidigit2labels(tidigitsarray):
@@ -125,18 +129,67 @@ def trfbank(fs, nfft, lowfreq=133.33, linsc=200/3., logsc=1.0711703, nlinfilt=13
 
     return fbank
 
+def global_distances(all_mfcc):
+    num_uttrances = len(all_mfcc)
+    D = np.zeros((num_uttrances,num_uttrances))
+    
+    for i in range(0,num_uttrances):
+        for j in range(0,num_uttrances):
+            localdist = tools.euclideans(all_mfcc[i],all_mfcc[j])
+            globaldist = tools.dtw(localdist)
+            D[i,j] = globaldist
+    
+    return D
+
+def compare_uttrances():
+    all_mfcc = []
+
+    for i in range(0,tidigits.size):
+        sample = tidigits[i].get('samples')
+        one_mfcc = mfcc(sample)
+        all_mfcc.append(one_mfcc)
+
+    D = global_distances(all_mfcc)
+
+    labels = tidigit2labels(tidigits)
+    Z = linkage(D,method='complete')
+
+    dendrogram(Z,labels=labels)
+    plt.show()
+
+def gaussian_mixture(all_mfcc):
+
+    Xtrain = np.matrix(all_mfcc[0])
+
+    for i in range(1,len(all_mfcc)):
+        Xtrain = np.concatenate((Xtrain,all_mfcc[i]))
+
+    clf = mixture.GaussianMixture(n_components=4)
+
+    gmm = clf.fit(Xtrain[:,0:2])
+
+    x = np.linspace(np.min(Xtrain), np.max(Xtrain), len(Xtrain))
+    y = np.linspace(np.min(Xtrain), np.max(Xtrain), len(Xtrain))
+    X, Y = np.meshgrid(x, y)
+    XX = np.array([X.ravel(), Y.ravel()]).T
+    Z = -clf.score_samples(XX)
+    Z = Z.reshape(X.shape)
+
+    CS = plt.contour(X, Y, Z, norm=LogNorm(vmin=1.0, vmax=1000.0),
+                 levels=np.logspace(0, 3, 10))
+    CB = plt.colorbar(CS, shrink=0.8, extend='both')
+    plt.scatter(Xtrain[:, 0], Xtrain[:, 1], .8)
+
+    plt.title('Negative log-likelihood predicted by a GMM')
+    plt.axis('tight')
+    plt.show()
 
 tidigits = np.load('tidigits.npz')['tidigits']
 example = np.load('example.npz')['example'].item()
 
-all_frames = np.array(tidigits[0].get('samples'))
-
-for i in range(1,tidigits.size):
-    all_frames = np.concatenate((all_frames,tidigits[i].get('samples'))) 
 
 
-features = mfcc(all_frames)
 
-#for i in range(2,3):
-    #feature = features[:,:i]
-    #print(np.corrcoef(feature))
+
+
+

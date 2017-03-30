@@ -184,6 +184,18 @@ def cepstrum(mspec, nceps):
     coefficients = dct(mspec,norm='ortho')
     return coefficients[:,:nceps]
 
+def ecludian_distances(vec):
+    return np.linalg.norm(vec)
+
+def euclideans(one_mfcc,other_mfcc):
+    ecludians = np.zeros((one_mfcc.shape[0],other_mfcc.shape[0]))
+
+    for i in range(0,one_mfcc.shape[0]):
+        for j in range(0,other_mfcc.shape[0]):
+            ecludians[i,j] = ecludian_distances(one_mfcc[i]-other_mfcc[j])
+
+    return ecludians
+
 def dtw(localdist):
     """Dynamic Time Warping.
 
@@ -194,4 +206,16 @@ def dtw(localdist):
     Output:
         globaldist: scalar, global distance computed by Dynamic Time Warping
     """
+    N = localdist.shape[0] 
+    M = localdist.shape[1]
 
+    Dtw = np.zeros((N,M))
+
+    for i in range(1,N):
+        for j in range(1,M):
+            loc_d = localdist[i][j]
+            Dtw[i,j] = loc_d + min(Dtw[i-1,j],Dtw[i,j-1],Dtw[i-1,j-1])
+
+    globaldist = Dtw[i,j]
+    
+    return globaldist 
