@@ -1,6 +1,8 @@
 import numpy as np
 import cPickle
 from scipy.optimize import check_grad
+import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 
 NUM_LABELS = 10
 LAMBD = 0
@@ -17,7 +19,6 @@ def unpickle(file):
     fo.close()
     return dict
 
-
 """
 X contains the image pixel data, has size d*N, is of type double or
 single and has entries between 0 and 1. N is the number of images
@@ -32,7 +33,7 @@ Matlab indexes matrices and vectors starting at 1. Therefore it may be
 easier to encode the labels between 1-10.
 
 """
-def load_batch():
+def load_one_batch():
 	data = unpickle('data_batch_1')
 	X = np.matrix(data.get('data')).T #
 	X = X.astype(float) / 255
@@ -41,13 +42,27 @@ def load_batch():
 	Y = ((np.arange(y.max()+1) == y[:,:]).astype(int)).T
 	return [X,Y,y]
 
+def load_batches():
+	data1 = unpickle('data_batch_1')
+	data2 = unpickle('data_batch_2')
+	data = np.concatenate((data1.get('data'),data2.get('data')))
+	X = np.matrix(data).T #
+	X = X.astype('float_') / 255
+	Y = np.zeros((NUM_LABELS,X.shape[1]))
+	y_1 = data1.get('labels')
+	y_2 = data2.get('labels')
+	y = np.array(y_1+y_2).reshape(-1,1)
+	Y = ((np.arange(y.max()+1) == y[:,:]).astype(int)).T
+	return [X,Y,y]
+
 
 def load_test():
 	test_data = unpickle('test_batch')
 	Xtest = np.matrix(test_data.get('data')).T
-	Xtest = Xtest.astype(float) / 255
+	Xtest = Xtest.astype('float64') / 255
 	y_test = np.array(test_data.get('labels')).reshape(-1,1)
-	return Xtest,y_test
+	Ytest = ((np.arange(y_test.max()+1) == y_test[:,:]).astype(int)).T
+	return Xtest,y_test, Ytest
 
 """
 W has size K*d and b is K*1. Initialize each entry to have Gaussian
@@ -129,9 +144,9 @@ def compute_gradients(X, Y, P, W,b):
 		g = -((Y[:,i] / (Y[:,i]*P[:,i])) * (diag_p-corresponding_softmax_probs*corresponding_softmax_probs.T))
 		gradb += g.T
 		gradW += g.T*X[:,i].T
-		gradW /= X.shape[1]
-		gradb /= X.shape[1]
-		gradW = gradW + 2*LAMBD*W  
+	gradW /= X.shape[1]
+	gradb /= X.shape[1]
+	gradW = gradW + 2*LAMBD*W  
 	return [gradW,gradb]
 
 
@@ -180,26 +195,41 @@ def compute_grads_num(X, Y, W, b, lbda, h):
     return grad_W, grad_b
 
 def train_softmax_reg():
-	[X,Y,y] = load_batch()
-	[W,b] = init_model(X.shape[0])
-	[Xbatches, Ybatches] = get_mini_batches(X,Y)
-	Xtest, ytest = load_test()
-	costs = []
-	for epoch in range(0,N_BATCH):
+	X,Y,y = load_one_batch()
+	W,b = init_model(X.shape[0])
+	Xtest, ytest, Ytest = load_test()
+	Xbatches, Ybatches = get_mini_batches(X,Y)
+	costs_train = []
+	costs_test = []
+	
+	for epoch in range(0,1):
 		for batch in range(0,len(Xbatches)):	 
 			P = evaluate_classifier(Xbatches[batch],W,b)
-			[gradW, gradB] = compute_gradients(Xbatches[batch],Ybatches[batch],P,W,b)
-			#print(check_grad(compute_gradients,gradW,Xbatches[batch]))
-			#[gradW_num,gradB_num] = compute_grads_num(Xbatches[batch],Ybatches[batch],W,b,LAMBD,0.000001)
-			#print(gradW-gradW_num)
+			gradW, gradB = compute_gradients(Xbatches[batch],Ybatches[batch],P,W,b)
 			W = W - ETA*gradW
 			b = b - ETA*gradB
 		P_test = evaluate_classifier(Xtest,W,b)
 		P_train = evaluate_classifier(X,W,b)
 		cost_train = compute_cost(X,Y,P_train,W)
-		print(cost_train)
-		print(compute_acc(ytest,P_test))
-		#costs.append(cost)
-		
+		cost_test = compute_cost(Xtest,Ytest,P_test,W)
+		print("cost train: %f" %cost_train)
+		print("cost test: %f" %cost_test)
+		print("accuracy test: %f" %compute_acc(ytest,P_test))
+		print("accuracy train: %f" %compute_acc(y,P_train))
+		costs_train.append(cost_train[0,0])
+		costs_test.append(cost_test[0,0])
+
+	epochs_arr = np.arange(0, N_EPOCHS).tolist()
+	"""
+	plt.plot(epochs_arr, costs_train, 'r-',label='training loss')
+	plt.plot(epochs_arr, costs_test, 'b-',label='validation loss')
+	plt.legend(loc='upper center', shadow=True)
+	plt.xlabel('Epoch')
+	plt.ylabel('Loss')
+	plt.show()
+	"""
+	img = W[1,:].reshape(32,32)
+	plt.imshow(img,origin='lower',interpolation='nearest',aspect='auto')
+	plt.show()
 
 train_softmax_reg()
