@@ -4,6 +4,11 @@ import matplotlib.pyplot as plt
 from scipy.cluster.hierarchy import linkage,dendrogram
 from sklearn import mixture
 from matplotlib.colors import LogNorm
+import itertools
+from scipy import linalg
+
+color_iter = itertools.cycle(['navy', 'c', 'cornflowerblue', 'gold',
+                              'darkorange'])
 # DT2118, Lab 1 Feature Extraction
 # - Functions given by the exercise -------------------------------------------- 
 
@@ -164,31 +169,29 @@ def gaussian_mixture(all_mfcc):
     for i in range(1,len(all_mfcc)):
         Xtrain = np.concatenate((Xtrain,all_mfcc[i]))
 
-    clf = mixture.GaussianMixture(n_components=4)
+    gmm = mixture.GaussianMixture(n_components=32).fit(Xtrain)
 
-    gmm = clf.fit(Xtrain[:,0:2])
+    predicted = gmm.predict_proba(Xtrain)
 
-    x = np.linspace(np.min(Xtrain), np.max(Xtrain), len(Xtrain))
-    y = np.linspace(np.min(Xtrain), np.max(Xtrain), len(Xtrain))
-    X, Y = np.meshgrid(x, y)
-    XX = np.array([X.ravel(), Y.ravel()]).T
-    Z = -clf.score_samples(XX)
-    Z = Z.reshape(X.shape)
+    
+    plt.plot(predicted)
 
-    CS = plt.contour(X, Y, Z, norm=LogNorm(vmin=1.0, vmax=1000.0),
-                 levels=np.logspace(0, 3, 10))
-    CB = plt.colorbar(CS, shrink=0.8, extend='both')
-    plt.scatter(Xtrain[:, 0], Xtrain[:, 1], .8)
 
-    plt.title('Negative log-likelihood predicted by a GMM')
-    plt.axis('tight')
     plt.show()
+   
+
 
 tidigits = np.load('tidigits.npz')['tidigits']
 example = np.load('example.npz')['example'].item()
 
+all_mfcc = []
 
+for i in range(0,tidigits.size):
+    sample = tidigits[i].get('samples')
+    one_mfcc = mfcc(sample)
+    all_mfcc.append(one_mfcc)
 
+gaussian_mixture(all_mfcc)
 
 
 

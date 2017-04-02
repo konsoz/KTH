@@ -3,6 +3,7 @@ import cPickle
 from scipy.optimize import check_grad
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+from mpl_toolkits.axes_grid1 import ImageGrid
 
 NUM_BATCH_FILES = 5
 
@@ -11,6 +12,7 @@ LAMBD = 1
 ETA = 0.01
 N_BATCH = 100
 N_EPOCHS = 40
+
 
 """
 Train accuracy improvements:
@@ -376,17 +378,6 @@ def train_svm():
 		costs_validation.append(cost_validation)
 
 
-
-
-def display(images, rows, cols):
-    fig = plt.figure(1, (4., 4.))
-    grid = ImageGrid(fig, 111, nrows_ncols=(rows, cols), axes_pad=0)
-
-    for i in range(rows*cols):
-        grid[i].imshow(images[i])
-        grid[i].axis('off')
-    plt.show(block=True)	
-
 def plot_cost(costs_train,costs_validation):
 	epochs_arr = np.arange(0, N_EPOCHS).tolist()
 
@@ -398,8 +389,22 @@ def plot_cost(costs_train,costs_validation):
 	plt.show()
 
 
-#train_svm()
+def plot_w(W):
+	fig, axes = plt.subplots(1, 10)
+	for coef, ax in zip(W, axes.ravel()):
+		im = coef.reshape(3,32,32)
+		im = (im - im.min()) / (im.max() - im.min())
+		im = im.T
+		im = np.rot90(im,k=3)
+		ax.imshow(im)
+		ax.set_xticks(())
+		ax.set_yticks(())
+    	plt.show()
 
+train_svm()
 
-costs_validation,costs_train,W,b = train_softmax_reg()
-plot_cost(costs_train,costs_validation)
+#costs_validation,costs_train,W,b = train_softmax_reg()
+
+#plot_w(W)
+
+#display(np.transpose(np.reshape(W, (W.shape[0], 3, 32, 32)), [0, 2, 3, 1]), 25, 25)

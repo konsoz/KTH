@@ -1,6 +1,6 @@
 # DT2118, Lab 1 Feature Extraction
 # Functions to be implemented ----------------------------------
-from __future__ import division
+#from __future__ import division
 import numpy as np
 import math as math
 import scipy.signal as scipysignal
@@ -22,10 +22,12 @@ def enframe(samples, winlen, winshift,samplingrate):
         in the input signal
     """
 
-    sample_len = (1/samplingrate)*1000
+    sample_len = (1/float(samplingrate))*1000
     sample_step = winlen/sample_len
     sample_shift_step = winshift/sample_len
     number_of_windows = math.ceil(((samples.size/sample_step)*2)-2)
+
+    sample_step = int(sample_step)
 
     frames = np.zeros((int(number_of_windows),sample_step))
 
