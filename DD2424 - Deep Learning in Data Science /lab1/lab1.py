@@ -248,7 +248,7 @@ def compute_gradients(X, Y, P, W,b):
 
 
 """
-Produce mini-batches of the training data into two 
+Produce mini-batches of the training data into two lists
 """
 def get_mini_batches(Xtrain,Ytrain):
 	Xbatches = []
@@ -326,9 +326,9 @@ def train_softmax_reg():
 		for batch in range(0,len(Xbatches)):
 			P = evaluate_classifier(Xbatches[batch],W,b)
 			gradW, gradB = compute_gradients(Xbatches[batch],Ybatches[batch],P,W,b)
-			W = W - ETA*gradW
-			b = b - ETA*gradB
-		#Eta = Eta * 0.9
+			W = W - Eta*gradW
+			b = b - Eta*gradB
+		Eta = Eta * 0.9
 		P_validation = evaluate_classifier(Xtest,W,b)
 		P_train = evaluate_classifier(X,W,b)
 		cost_train = compute_cost(X,Y,P_train,W)
@@ -339,8 +339,8 @@ def train_softmax_reg():
 		print("Cost validation: %f" %cost_validation)
 		print("Accuracy validation: %f" %acc_validation)
 		print("Accuracy train: %f" %acc_train)
-		#if(np.absolute(cost_validation[0,0]-cost_train[0,0]) > 3.5):
-		#	break
+		if(np.absolute(cost_validation[0,0]-cost_train[0,0]) > 3.5):
+			break
 		costs_train.append(cost_train[0,0])
 		costs_validation.append(cost_validation[0,0])
 
@@ -401,10 +401,8 @@ def plot_w(W):
 		ax.set_yticks(())
     	plt.show()
 
-train_svm()
+#train_svm()
 
-#costs_validation,costs_train,W,b = train_softmax_reg()
+costs_validation,costs_train,W,b = train_softmax_reg()
 
-#plot_w(W)
-
-#display(np.transpose(np.reshape(W, (W.shape[0], 3, 32, 32)), [0, 2, 3, 1]), 25, 25)
+plot_w(W)
