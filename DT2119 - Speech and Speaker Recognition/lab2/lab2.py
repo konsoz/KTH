@@ -66,7 +66,9 @@ def main():
 
     log_emlik_hmm = log_emlik(example.get('mfcc'),hmm_model.get['means'],hmm_model.get('covars'))
 
-    
+
+
+    print()
 
 
 if __name__ == "__main__":
