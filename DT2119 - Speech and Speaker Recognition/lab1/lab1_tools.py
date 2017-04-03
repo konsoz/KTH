@@ -221,3 +221,16 @@ def dtw(localdist):
     globaldist = Dtw[i,j]
     
     return globaldist 
+
+
+def global_distances(all_mfcc):
+    num_uttrances = len(all_mfcc)
+    D = np.zeros((num_uttrances,num_uttrances))
+    
+    for i in range(0,num_uttrances):
+        for j in range(0,num_uttrances):
+            localdist = euclideans(all_mfcc[i],all_mfcc[j])
+            globaldist = dtw(localdist)
+            D[i,j] = globaldist
+    
+    return D

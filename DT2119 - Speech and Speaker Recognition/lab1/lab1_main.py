@@ -134,19 +134,8 @@ def trfbank(fs, nfft, lowfreq=133.33, linsc=200/3., logsc=1.0711703, nlinfilt=13
 
     return fbank
 
-def global_distances(all_mfcc):
-    num_uttrances = len(all_mfcc)
-    D = np.zeros((num_uttrances,num_uttrances))
-    
-    for i in range(0,num_uttrances):
-        for j in range(0,num_uttrances):
-            localdist = tools.euclideans(all_mfcc[i],all_mfcc[j])
-            globaldist = tools.dtw(localdist)
-            D[i,j] = globaldist
-    
-    return D
 
-def compare_uttrances():
+def feature_correlation():
     all_mfcc = []
 
     for i in range(0,tidigits.size):
@@ -154,7 +143,32 @@ def compare_uttrances():
         one_mfcc = mfcc(sample)
         all_mfcc.append(one_mfcc)
 
-    D = global_distances(all_mfcc)
+    Xtrain = np.matrix(all_mfcc[0])
+
+    for i in range(1,len(all_mfcc)):
+        Xtrain = np.concatenate((Xtrain,all_mfcc[i]))
+
+    correlation_coefficients = np.zeros((Xtrain.shape[1],Xtrain.shape[1]))
+
+    for i in range(0, Xtrain.shape[1]):
+        for j in range(0, Xtrain.shape[1]):
+            coeff = np.array(Xtrain[:,i]).T.reshape(-1)
+            another_coeff = np.array(Xtrain[:,j]).T.reshape(-1)
+            correlation_coefficients[i,j] = np.correlate(coeff,another_coeff)
+
+    plt.pcolormesh(correlation_coefficients)
+    plt.show()
+
+def compare_uttrances():
+    tidigits = np.load('tidigits.npz')['tidigits']
+    all_mfcc = []
+
+    for i in range(0,tidigits.size):
+        sample = tidigits[i].get('samples')
+        one_mfcc = mfcc(sample)
+        all_mfcc.append(one_mfcc)
+
+    D = tools.global_distances(all_mfcc)
 
     labels = tidigit2labels(tidigits)
     Z = linkage(D,method='complete')
@@ -162,7 +176,14 @@ def compare_uttrances():
     dendrogram(Z,labels=labels)
     plt.show()
 
-def gaussian_mixture(all_mfcc):
+def gaussian_mixture():
+    tidigits = np.load('tidigits.npz')['tidigits']
+    all_mfcc = []
+
+    for i in range(0,tidigits.size):
+        sample = tidigits[i].get('samples')
+        one_mfcc = mfcc(sample)
+        all_mfcc.append(one_mfcc)
 
     Xtrain = np.matrix(all_mfcc[0])
 
@@ -171,28 +192,26 @@ def gaussian_mixture(all_mfcc):
 
     gmm = mixture.GaussianMixture(n_components=32).fit(Xtrain)
 
-    predicted = gmm.predict_proba(Xtrain)
+    mfcc_seven = []
 
-    
+    mfcc_seven.append(mfcc(tidigits[16].get('samples')))
+    mfcc_seven.append(mfcc(tidigits[17].get('samples')))
+    mfcc_seven.append(mfcc(tidigits[38].get('samples')))
+    mfcc_seven.append(mfcc(tidigits[39].get('samples')))
+
+    Xpred_only_seven = np.matrix(mfcc_seven[0])
+
+    for i in range(1,len(mfcc_seven)):
+        Xpred_only_seven = np.concatenate((Xpred_only_seven,mfcc_seven[i]))
+
+
+    predicted = gmm.predict_proba(Xpred_only_seven)
+
     plt.plot(predicted)
-
-
     plt.show()
    
 
 
-tidigits = np.load('tidigits.npz')['tidigits']
-example = np.load('example.npz')['example'].item()
-
-all_mfcc = []
-
-for i in range(0,tidigits.size):
-    sample = tidigits[i].get('samples')
-    one_mfcc = mfcc(sample)
-    all_mfcc.append(one_mfcc)
-
-gaussian_mixture(all_mfcc)
 
 
-
-
+gaussian_mixture()
