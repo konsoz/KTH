@@ -65,8 +65,7 @@ def main():
     gmm_model = models[0]['gmm']
 
     log_emlik_hmm = log_emlik(example.get('mfcc'),hmm_model.get['means'],hmm_model.get('covars'))
-
-    print()
+    
 
 
 
