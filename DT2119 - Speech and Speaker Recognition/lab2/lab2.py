@@ -1,6 +1,7 @@
 import numpy as np
 from tools import *
 from sklearn.mixture import log_multivariate_normal_density
+import matplotlib.pyplot as plt
 
 def log_emlik(X, means, covars):
     return log_multivariate_normal_density(X,means,covars)
@@ -64,11 +65,11 @@ def main():
     hmm_model = models[0]['hmm']
     gmm_model = models[0]['gmm']
 
-    log_emlik_hmm = log_emlik(example.get('mfcc'),hmm_model.get['means'],hmm_model.get('covars'))
+    log_emlik_hmm = log_emlik(example.get('mfcc'),hmm_model.get('means'),hmm_model.get('covars'))
+    log_emlik_gmm = log_emlik(example.get('mfcc'),gmm_model.get('means'),gmm_model.get('covars'))
 
-
-
-    print()
+    plt.pcolor   mesh(log_emlik_hmm)
+    plt.show()
 
 
 if __name__ == "__main__":
