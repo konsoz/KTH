@@ -1,5 +1,5 @@
 import numpy as np
-from tools import *
+import tools as tools
 from sklearn.mixture import log_multivariate_normal_density
 import matplotlib.pyplot as plt
 
@@ -18,6 +18,14 @@ def gmmloglik(log_emlik, weights):
     Output:
         gmmloglik: scalar, log likelihood of data given the GMM model.
     """
+    result = 0
+    for i in range(0,log_emlik.shape[0]):
+        ith = log_emlik[i]
+        logsumexp = tools.logsumexp(ith)
+        log_weights = np.log(np.sum(weights))
+        result += logsumexp + log_weights
+        
+    return result
 
 def forward(log_emlik, log_startprob, log_transmat):
     """Forward probabilities in log domain.
@@ -65,12 +73,40 @@ def main():
     hmm_model = models[0]['hmm']
     gmm_model = models[0]['gmm']
 
-    log_emlik_hmm = log_emlik(example.get('mfcc'),hmm_model.get('means'),hmm_model.get('covars'))
     log_emlik_gmm = log_emlik(example.get('mfcc'),gmm_model.get('means'),gmm_model.get('covars'))
+    
+    log_lik = gmmloglik(log_emlik_gmm,gmm_model.get('weights'))
 
-    plt.pcolor   mesh(log_emlik_hmm)
-    plt.show()
+    print(log_lik)
+    print(example.get('gmm_loglik'))
+
+    #transition = hmm_model.get('transmat')
+    #startprob = hmm_model.get('startprob')
+
+    #log_emlik_hmm = log_emlik(example.get('mfcc'),hmm_model.get('means'),hmm_model.get('covars'))
+
+    #print(transition)
+    #print(startprob)
+    
+    #plt.pcolormesh(np.rot90(log_emlik_hmm,k=4).T)
+    #plt.show()
 
 
 if __name__ == "__main__":
     main()
+
+
+
+"""
+
+Notes:
+
+Multivariate Gaussian Density
+
+y - state, x - time
+
+Given state 0 (silence), the probability of time interval where we actually speak 
+to state 0 is lower since we are speaking. Same thing applies to the last state.
+
+
+"""

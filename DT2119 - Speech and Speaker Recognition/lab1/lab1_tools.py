@@ -136,7 +136,7 @@ def powerSpectrum(windowed, nfft):
 
     fast_fuorier_transformed = np.absolute(fft(windowed,nfft))**2
 
-    #plt.imshow(fast_fuorier_transformed,origin='lower',interpolation='nearest',aspect='auto')
+    #plt.pcolormesh(fast_fuorier_transformed)
     #plt.show()
 
     return fast_fuorier_transformed    

@@ -136,6 +136,7 @@ def trfbank(fs, nfft, lowfreq=133.33, linsc=200/3., logsc=1.0711703, nlinfilt=13
 
 
 def feature_correlation():
+    tidigits = np.load('tidigits.npz')['tidigits']
     all_mfcc = []
 
     for i in range(0,tidigits.size):
@@ -156,7 +157,9 @@ def feature_correlation():
             another_coeff = np.array(Xtrain[:,j]).T.reshape(-1)
             correlation_coefficients[i,j] = np.correlate(coeff,another_coeff)
 
-    plt.pcolormesh(correlation_coefficients)
+    corr_coef = np.corrcoef(Xtrain, rowvar=0)
+
+    plt.pcolormesh(corr_coef)
     plt.show()
 
 def compare_uttrances():
@@ -214,4 +217,4 @@ def gaussian_mixture():
 
 
 
-gaussian_mixture()
+feature_correlation()

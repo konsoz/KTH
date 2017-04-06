@@ -260,7 +260,7 @@ def get_mini_batches(Xtrain,Ytrain):
 		Ybatch = Ytrain[:,j_start:j_end]
 		Xbatches.append(Xbatch)
 		Ybatches.append(Ybatch)
-	return [Xbatches,Ybatches]
+	return Xbatches,Ybatches
 
 def get_mini_batches_svm(Xtrain,y_train):
 	Xbatches = []
