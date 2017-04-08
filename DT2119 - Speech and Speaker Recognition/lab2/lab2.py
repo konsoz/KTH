@@ -1,10 +1,26 @@
 import numpy as np
 import tools as tools
-from sklearn.mixture import log_multivariate_normal_density
+#from sklearn.mixture import log_multivariate_normal_density
 import matplotlib.pyplot as plt
 
+def gmm_recognition(models,tidigits):
+    for tidigit in tidigits:
+        model_log_likelihoods = []  
+        for m in xrange(len(models)):
+            model = models[m]
+            gmm_model = model.get('gmm')
+            log_emlik_gmm = log_emlik(tidigit.get('mfcc'),gmm_model.get('means'),gmm_model.get('covars'))
+            log_lik = gmmloglik(log_emlik_gmm,gmm_model.get('weights'))
+            model_log_likelihoods.append(log_lik)
+        print("Tidigit :", tidigit.get('digit'))
+        print("Has highest log liklehood with following model: ")
+        best_model_id = model_log_likelihoods.index(max(model_log_likelihoods))
+        best_model = models[best_model_id]
+        print("Model was for digit %s", best_model.get('digit'))
+
+
 def log_emlik(X, means, covars):
-    return log_multivariate_normal_density(X,means,covars)
+    return tools.log_multivariate_normal_density_diag(X,means,covars)
 
 def gmmloglik(log_emlik, weights):
     """Log Likelihood for a GMM model based on Multivariate Normal Distribution.
@@ -20,11 +36,11 @@ def gmmloglik(log_emlik, weights):
     """
     result = 0
     for i in range(0,log_emlik.shape[0]):
-        ith = log_emlik[i]
-        logsumexp = tools.logsumexp(ith)
-        log_weights = np.log(np.sum(weights))
-        result += logsumexp + log_weights
-        
+        obsloglik = log_emlik[i]
+        log_weights = np.log(weights)
+        logsumexp = tools.logsumexp(log_weights+obsloglik)
+        result += logsumexp
+      
     return result
 
 def forward(log_emlik, log_startprob, log_transmat):
@@ -73,12 +89,7 @@ def main():
     hmm_model = models[0]['hmm']
     gmm_model = models[0]['gmm']
 
-    log_emlik_gmm = log_emlik(example.get('mfcc'),gmm_model.get('means'),gmm_model.get('covars'))
-    
-    log_lik = gmmloglik(log_emlik_gmm,gmm_model.get('weights'))
-
-    print(log_lik)
-    print(example.get('gmm_loglik'))
+    gmm_recognition(models,tidigits)
 
     #transition = hmm_model.get('transmat')
     #startprob = hmm_model.get('startprob')

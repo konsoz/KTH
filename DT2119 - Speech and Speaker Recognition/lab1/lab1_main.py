@@ -149,6 +149,7 @@ def feature_correlation():
     for i in range(1,len(all_mfcc)):
         Xtrain = np.concatenate((Xtrain,all_mfcc[i]))
 
+    """
     correlation_coefficients = np.zeros((Xtrain.shape[1],Xtrain.shape[1]))
 
     for i in range(0, Xtrain.shape[1]):
@@ -156,7 +157,8 @@ def feature_correlation():
             coeff = np.array(Xtrain[:,i]).T.reshape(-1)
             another_coeff = np.array(Xtrain[:,j]).T.reshape(-1)
             correlation_coefficients[i,j] = np.correlate(coeff,another_coeff)
-
+    """
+    
     corr_coef = np.corrcoef(Xtrain, rowvar=0)
 
     plt.pcolormesh(corr_coef)
