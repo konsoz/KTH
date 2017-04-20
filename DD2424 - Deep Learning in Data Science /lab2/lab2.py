@@ -1,6 +1,7 @@
 import numpy as np
 import cPickle
 from random import randrange
+import math
 
 class DataLoader:
 
@@ -82,7 +83,7 @@ class DataLoader:
 class NeuralNetwork:
 
 	NODES_IN_HIDDEN = 50
-	N_EPOCHS = 5
+	N_EPOCHS = 20
 	
 	# Hyper-parameters
 	MU = 0.9
@@ -111,8 +112,6 @@ class NeuralNetwork:
 		self.W2_moment = np.zeros(self.W2.shape)
 		self.b1_moment = np.zeros(self.b1.shape)
 		self.b2_moment = np.zeros(self.b2.shape)
-
-		print 'Start Eta: %f' % self.ETA
 
 	def score_function(self, X, W, b):
 		return W*X+b
@@ -282,10 +281,18 @@ def rel_error(x, y):
 
 def main():
 	data = DataLoader()
-	network = NeuralNetwork(data.X_train.shape[0],data.Y_train.shape[0])
-	network.train(data.Xbatches, data.Ybatches)
 
-	print(network.compute_acc(data.y_valid, data.X_valid))
+	for i in range(1):
+		#eta = 10**np.random.uniform(-2.7,-0.5)
+		#eta = 10**np.random.uniform(-1.28068529,-1.19666581528)
+		#lmbd = 10**np.random.uniform(-3,-0.3)
+		#lmbd = 10**np.random.uniform(-2.90587840416,-2.73969005421)
+		eta = 0.055619
+		lmbd = 0.001557
+		network = NeuralNetwork(data.X_train.shape[0],data.Y_train.shape[0],eta,lmbd)
+		network.train(data.Xbatches, data.Ybatches)
+		validation_accuracy = network.compute_acc(data.y_test, data.X_test)
+		print 'Validation accuracy: %f || Eta: %f || Lambda: %f' % (validation_accuracy,eta,lmbd)
 
 if __name__ == "__main__":
     main()
@@ -297,7 +304,7 @@ if __name__ == "__main__":
 Notes :
 
 Eta range : 0.3 - 0.002
-Lambda range : 0.1 - 1 
+Lambda range : 0.001 - 0.5 
 
 
 """
