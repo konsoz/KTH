@@ -1,13 +1,13 @@
 import numpy as np
 import cPickle
 from random import randrange
-import math
+import matplotlib.pyplot as plt
 
 class DataLoader:
 
-	TRAIN_SIZE = 10000
-	VALIDATION_SIZE = 10000
-	NUM_BATCH_FILES = 2
+	TRAIN_SIZE = 49000
+	VALIDATION_SIZE = 1000
+	NUM_BATCH_FILES = 5
 	NUM_LABELS = 10
 	N_BATCH = 100
 
@@ -83,7 +83,7 @@ class DataLoader:
 class NeuralNetwork:
 
 	NODES_IN_HIDDEN = 50
-	N_EPOCHS = 20
+	N_EPOCHS = 30
 	
 	# Hyper-parameters
 	MU = 0.9
@@ -205,7 +205,7 @@ class NeuralNetwork:
 
 		return gradW1,gradb1,gradW2,gradb2
 
-	def train(self,Xbatches,Ybatches):
+	def train(self,Xbatches,Ybatches,X_train,Y_train,X_valid,Y_valid):
 		costs_train = []
 		costs_validation = []
 	
@@ -229,26 +229,30 @@ class NeuralNetwork:
 				#grad_check_sparse(lambda W: self.compute_cost(Xbatches[batch],Ybatches[batch],self.W1,self.W2,self.b1,self.b2), self.W2,gradW2,1)
 
 				# Momentum update
-				self.W1_moment = self.MU * self.W1_moment - self.ETA * gradW1
-				self.W2_moment = self.MU * self.W2_moment - self.ETA * gradW2
-				self.b1_moment = self.MU * self.b1_moment - self.ETA * gradb1
-				self.b2_moment = self.MU * self.b2_moment - self.ETA * gradb2
+				self.W1_moment = self.MU * self.W1_moment + self.ETA * gradW1
+				self.W2_moment = self.MU * self.W2_moment + self.ETA * gradW2
+				self.b1_moment = self.MU * self.b1_moment + self.ETA * gradb1
+				self.b2_moment = self.MU * self.b2_moment + self.ETA * gradb2
 
 				# Update weights and bias
-				self.W1 += self.W1_moment
-				self.W2 += self.W2_moment
+				self.W1 -= self.W1_moment
+				self.W2 -= self.W2_moment
 
-				self.b1 += self.b1_moment
-				self.b2 += self.b2_moment
+				self.b1 -= self.b1_moment
+				self.b2 -= self.b2_moment
 			
 			# Eta update
 			self.ETA = self.ETA * self.DECAY_RATE
-			#cost_train = self.compute_cost(X_train, Y_train)
-			#cost_validation = self.compute_cost(X_valid, Y_valid, self.W1, self.W2, self.b1, self.b2)
-			#print 'Cost train: %f' % cost_train
-			#acc_train = self.compute_acc(y_train,X_train)
-			#print 'Accuracy train: %f' % acc_train
-			#print("Cost validation: %f" %cost_validation)
+			cost_train = self.compute_cost(X_train, Y_train)
+			cost_validation = self.compute_cost(X_valid, Y_valid)
+			print "Cost validation: %f" %cost_validation
+			print "Cost train: %f" %cost_train
+			costs_train.append(cost_train[0,0])
+			costs_validation.append(cost_validation[0,0])
+
+		plot_cost(costs_train,costs_validation)
+
+
 
 def grad_check_sparse(f, x, analytic_grad, num_checks):
   """
@@ -279,20 +283,30 @@ def rel_error(x, y):
   """ returns relative error """
   return np.max(np.abs(x - y) / (np.maximum(1e-8, np.abs(x) + np.abs(y))))
 
+def plot_cost(costs_train,costs_validation):
+	epochs_arr = np.arange(0, 30).tolist()
+
+	plt.plot(epochs_arr, costs_train, 'r-',label='training loss')
+	plt.plot(epochs_arr, costs_validation, 'b-',label='validation loss')
+	plt.legend(loc='upper center', shadow=True)
+	plt.xlabel('Epoch')
+	plt.ylabel('Loss')
+	plt.show()
+
 def main():
 	data = DataLoader()
 
 	for i in range(1):
-		#eta = 10**np.random.uniform(-2.7,-0.5)
-		#eta = 10**np.random.uniform(-1.28068529,-1.19666581528)
-		#lmbd = 10**np.random.uniform(-3,-0.3)
-		#lmbd = 10**np.random.uniform(-2.90587840416,-2.73969005421)
-		eta = 0.055619
-		lmbd = 0.001557
+		#eta = 10**np.random.uniform(-6.21,-1.2)
+		#eta = 10**np.random.uniform(-1.5529971,-1.19314875)
+		#lmbd = 10**np.random.uniform(-6,1)
+		#lmbd = 10**np.random.uniform(-4.36653154,-2.4779472)
+		eta = 0.030764
+		lmbd = 0.002119
 		network = NeuralNetwork(data.X_train.shape[0],data.Y_train.shape[0],eta,lmbd)
-		network.train(data.Xbatches, data.Ybatches)
+		network.train(data.Xbatches, data.Ybatches, data.X_train, data.Y_train, data.X_valid, data.Y_valid)
 		validation_accuracy = network.compute_acc(data.y_test, data.X_test)
-		print 'Validation accuracy: %f || Eta: %f || Lambda: %f' % (validation_accuracy,eta,lmbd)
+		print 'Test accuracy: %f || Eta: %f || Lambda: %f' % (validation_accuracy,eta,lmbd)
 
 if __name__ == "__main__":
     main()
