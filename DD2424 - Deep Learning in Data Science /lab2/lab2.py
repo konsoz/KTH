@@ -2,6 +2,7 @@ import numpy as np
 import cPickle
 from random import randrange
 import matplotlib.pyplot as plt
+import math
 
 class DataLoader:
 
@@ -82,36 +83,82 @@ class DataLoader:
 
 class NeuralNetwork:
 
-	NODES_IN_HIDDEN = 50
+	NODES_IN_HIDDEN = 100
 	N_EPOCHS = 30
 	
 	# Hyper-parameters
 	MU = 0.9
 	DECAY_RATE = 0.95
+	# Smoothing term
+	EPS = 1e-8
 
-	def __init__(self,data_dim, num_labels, eta=0.1, lmbd=0.000001):
-		# Note from stanford course:
-		# It turns out that we can normalize the variance of each neuron's output to 
-		# 1 by scaling its weight vector by the square root of its fan-in (i.e. its number of inputs). 
-		# That is, the recommended heuristic is to initialize each neuron's weight vector as: 
-		# w = np.random.randn(n) / sqrt(n), where n is the number of its inputs.
+	# Adam beta
+	BETA1 = 0.9
+	BETA2 = 0.999
+
+	def __init__(self,data_dim, num_labels, init_mode, eta=0.1, lmbd=0):
 
 		# Hyper-parameters
 		self.LAMBDA = lmbd
 		self.ETA = eta
 
-		# Weights and bias
-		self.W1 = np.random.normal(0,0.01,(self.NODES_IN_HIDDEN, data_dim))
-		self.W2 = np.random.normal(0,0.01,(num_labels, self.NODES_IN_HIDDEN))
-
+		# Bias
 		self.b1 = np.zeros((self.NODES_IN_HIDDEN,1))
 		self.b2 = np.zeros((num_labels,1))
+
+		if init_mode == 1:
+			self.W1 = np.random.normal(0,0.01,(self.NODES_IN_HIDDEN, data_dim))
+			self.W2 = np.random.normal(0,0.01,(num_labels, self.NODES_IN_HIDDEN))
+
+		if init_mode == 2:
+			self.W1 = np.zeros((self.NODES_IN_HIDDEN,data_dim))
+			for i in xrange(self.W1.shape[0]):
+				self.W1[i] = np.random.randn(self.W1.shape[1]) * math.sqrt(2.0/self.W1.shape[1])
+
+			self.W2 = np.zeros((num_labels, self.NODES_IN_HIDDEN))
+			for i in xrange(self.W2.shape[0]):
+				self.W2[i] = np.random.randn(self.W2.shape[1]) * math.sqrt(2.0 / self.W2.shape[1])
+		
+		if init_mode == 3:
+			self.W1 = np.zeros((self.NODES_IN_HIDDEN,data_dim))
+			for i in xrange(self.W1.shape[0]):
+				self.W1[i] = np.random.randn(self.W1.shape[1]) / math.sqrt(self.W1.shape[1])
+
+			self.W2 = np.zeros((num_labels, self.NODES_IN_HIDDEN))
+			for i in xrange(self.W2.shape[0]):
+				self.W2[i] = np.random.randn(self.W2.shape[1]) / math.sqrt(self.W2.shape[1])
+
+		if init_mode == 4:
+			self.W1 = np.random.normal(0,0.1,(self.NODES_IN_HIDDEN, data_dim))
+			self.W2 = np.random.normal(0,0.1,(num_labels, self.NODES_IN_HIDDEN))
 
 		# Momentum
 		self.W1_moment = np.zeros(self.W1.shape)
 		self.W2_moment = np.zeros(self.W2.shape)
 		self.b1_moment = np.zeros(self.b1.shape)
 		self.b2_moment = np.zeros(self.b2.shape)
+
+		"""
+		# Cache for Adagrad / RMSprop
+		self.W1_cache = np.zeros(self.W1.shape)
+		self.W2_cache = np.zeros(self.W2.shape)
+		self.b1_cache = np.zeros(self.b1.shape)
+		self.b2_cache = np.zeros(self.b2.shape)
+
+		# m,v for Adam
+
+		self.W1_M = np.zeros(self.W1.shape)
+		self.W1_V = np.zeros(self.W1.shape)
+
+		self.W2_M = np.zeros(self.W2.shape)
+		self.W2_V = np.zeros(self.W2.shape)
+
+		self.b1_M = np.zeros(self.b1.shape)
+		self.b1_V = np.zeros(self.b1.shape)
+
+		self.b2_M = np.zeros(self.b2.shape)
+		self.b2_V = np.zeros(self.b2.shape)
+		"""
 
 	def score_function(self, X, W, b):
 		return W*X+b
@@ -122,15 +169,10 @@ class NeuralNetwork:
 	def softmax_probabilities(self,scores):
 		return (np.exp(scores) / np.sum(np.exp(scores), axis=0))
 
-	def compute_acc(self,y,X):
+	def predict(self,X):
 		P = self.get_model_probs(X)
-
 		preds = np.argmax(P,axis=0).T
-		diff = preds - y
-		num_correct = diff[diff == 0].shape[1]
-		num_tot = y.shape[0]
-		acc = num_correct / float(num_tot)
-		return acc*100
+		return preds
 
 	def get_model_probs(self,X):
 		scores_hidden = self.score_function(X,self.W1,self.b1)
@@ -205,7 +247,7 @@ class NeuralNetwork:
 
 		return gradW1,gradb1,gradW2,gradb2
 
-	def train(self,Xbatches,Ybatches,X_train,Y_train,X_valid,Y_valid):
+	def train(self,Xbatches,Ybatches,X_train,Y_train,X_valid,Y_valid, y_valid):
 		costs_train = []
 		costs_validation = []
 	
@@ -240,17 +282,61 @@ class NeuralNetwork:
 
 				self.b1 -= self.b1_moment
 				self.b2 -= self.b2_moment
-			
+				
+				"""
+				# Adam 
+				self.W1_M = self.BETA1 * self.W1_M + (1 - self.BETA1) * gradW1
+				self.W1_V = self.BETA2 * self.W1_V + (1 - self.BETA2) * (gradW1**2)
+				self.W1 += - self.ETA * self.W1_M / (np.sqrt(self.W1_V) + self.EPS)
+
+				self.W2_M = self.BETA1 * self.W2_M + (1 - self.BETA1) * gradW2
+				self.W2_V = self.BETA2 * self.W2_V + (1 - self.BETA2) * (gradW2**2)
+				self.W2 += - self.ETA * self.W2_M / (np.sqrt(self.W2_V) + self.EPS)
+
+				self.b1_M = self.BETA1 * self.b1_M + (1 - self.BETA1) * gradb1
+				self.b1_V = self.BETA2 * self.b1_V + (1 - self.BETA2) * (gradb1**2)
+				self.b1 += - self.ETA * self.b1_M / (np.sqrt(self.b1_V) + self.EPS)
+
+				self.b2_M = self.BETA1 * self.b2_M + (1 - self.BETA1) * gradb2
+				self.b2_V = self.BETA2 * self.b2_V + (1 - self.BETA2) * (gradb2**2)
+				self.b2 += - self.ETA * self.b2_M / (np.sqrt(self.b2_V) + self.EPS)
+
+				# RMSprop
+				self.W1_cache = self.DECAY_RATE * self.W1_cache + (1 - self.DECAY_RATE) * gradW1**2
+				self.W2_cache = self.DECAY_RATE * self.W2_cache + (1 - self.DECAY_RATE) * gradW2**2
+				self.b1_cache = self.DECAY_RATE * self.b1_cache + (1 - self.DECAY_RATE) * gradb1**2
+				self.b2_cache = self.DECAY_RATE * self.b2_cache + (1 - self.DECAY_RATE) * gradb2**2
+
+				self.W1 += - self.ETA * gradW1 / (np.sqrt(self.W1_cache) + self.EPS)
+				self.W2 += - self.ETA * gradW2 / (np.sqrt(self.W2_cache) + self.EPS)
+				self.b1 += - self.ETA * gradb1 / (np.sqrt(self.b1_cache) + self.EPS)
+				self.b2 += - self.ETA * gradb2 / (np.sqrt(self.b2_cache) + self.EPS)
+
+				# Adagrad
+				self.W1_cache += gradW1**2
+				self.W2_cache += gradW2**2
+				self.b1_cache += gradb1**2
+				self.b2_cache += gradb2**2
+
+				self.W1 += - self.ETA * gradW1 / (np.sqrt(self.W1_cache) + self.EPS)
+				self.W2 += - self.ETA * gradW2 / (np.sqrt(self.W2_cache) + self.EPS)
+				self.b1 += - self.ETA * gradb1 / (np.sqrt(self.b1_cache) + self.EPS)
+				self.b2 += - self.ETA * gradb2 / (np.sqrt(self.b2_cache) + self.EPS)
+
+				"""
 			# Eta update
 			self.ETA = self.ETA * self.DECAY_RATE
-			cost_train = self.compute_cost(X_train, Y_train)
-			cost_validation = self.compute_cost(X_valid, Y_valid)
-			print "Cost validation: %f" %cost_validation
-			print "Cost train: %f" %cost_train
-			costs_train.append(cost_train[0,0])
-			costs_validation.append(cost_validation[0,0])
+			#cost_train = self.compute_cost(X_train, Y_train)
+			#cost_validation = self.compute_cost(X_valid, Y_valid)
+			#validation_acc = self.compute_acc(y_valid,X_valid)
+			#print "Cost validation: %f" %cost_validation
+			#print "Cost train: %f" %cost_train
+			#print "Validation accuracy: " , validation_acc,  " %"
+			#print "Epoch" , epoch, "done..."
+			#costs_train.append(cost_train[0,0])
+			#costs_validation.append(cost_validation[0,0])
 
-		plot_cost(costs_train,costs_validation)
+		#plot_cost(costs_train,costs_validation)
 
 
 
@@ -284,7 +370,7 @@ def rel_error(x, y):
   return np.max(np.abs(x - y) / (np.maximum(1e-8, np.abs(x) + np.abs(y))))
 
 def plot_cost(costs_train,costs_validation):
-	epochs_arr = np.arange(0, 30).tolist()
+	epochs_arr = np.arange(0, 10).tolist()
 
 	plt.plot(epochs_arr, costs_train, 'r-',label='training loss')
 	plt.plot(epochs_arr, costs_validation, 'b-',label='validation loss')
@@ -293,20 +379,54 @@ def plot_cost(costs_train,costs_validation):
 	plt.ylabel('Loss')
 	plt.show()
 
+def get_accuracy(network1_pred, network2_pred, network3_pred, network4_pred, network5_pred, y):
+
+	preds = np.zeros(y.shape)
+	ensamble = np.concatenate((network1_pred,network2_pred,network3_pred,network4_pred,network5_pred),axis=1)
+
+	for i in xrange(preds.shape[0]):
+		v = ensamble[i].tolist()[0]
+		votes = np.bincount(v)
+		winning_vote = np.argmax(votes)
+		preds[i] = winning_vote
+
+	diff = preds - y
+	print diff.shape
+	num_correct = diff[diff == 0].shape[0]
+	num_tot = y.shape[0]
+	acc = num_correct / float(num_tot)
+	return acc*100
+
 def main():
 	data = DataLoader()
 
 	for i in range(1):
-		#eta = 10**np.random.uniform(-6.21,-1.2)
-		#eta = 10**np.random.uniform(-1.5529971,-1.19314875)
-		#lmbd = 10**np.random.uniform(-6,1)
-		#lmbd = 10**np.random.uniform(-4.36653154,-2.4779472)
+
 		eta = 0.030764
-		lmbd = 0.002119
-		network = NeuralNetwork(data.X_train.shape[0],data.Y_train.shape[0],eta,lmbd)
-		network.train(data.Xbatches, data.Ybatches, data.X_train, data.Y_train, data.X_valid, data.Y_valid)
-		validation_accuracy = network.compute_acc(data.y_test, data.X_test)
-		print 'Test accuracy: %f || Eta: %f || Lambda: %f' % (validation_accuracy,eta,lmbd)
+		lmbd = 0.002238
+		
+		network1 = NeuralNetwork(data.X_train.shape[0], data.Y_train.shape[0], 1, eta, lmbd)
+		network1.train(data.Xbatches, data.Ybatches, data.X_train, data.Y_train, data.X_valid, data.Y_valid, data.y_valid)
+		preds1 = network1.predict(data.X_test)
+
+		network2 = NeuralNetwork(data.X_train.shape[0], data.Y_train.shape[0], 2, eta, lmbd)
+		network2.train(data.Xbatches, data.Ybatches, data.X_train, data.Y_train, data.X_valid, data.Y_valid, data.y_valid)
+		preds2 = network2.predict(data.X_test)
+
+		network3 = NeuralNetwork(data.X_train.shape[0],data.Y_train.shape[0], 3, eta, lmbd)
+		network3.train(data.Xbatches, data.Ybatches, data.X_train, data.Y_train, data.X_valid, data.Y_valid, data.y_valid)
+		preds3 = network3.predict(data.X_test)
+
+		network4 = NeuralNetwork(data.X_train.shape[0], data.Y_train.shape[0], 4, eta, lmbd)
+		network1.train(data.Xbatches, data.Ybatches, data.X_train, data.Y_train, data.X_valid, data.Y_valid, data.y_valid)
+		preds4 = network4.predict(data.X_test)
+
+		network5 = NeuralNetwork(data.X_train.shape[0],data.Y_train.shape[0], 2, eta, lmbd)
+		network5.train(data.Xbatches, data.Ybatches, data.X_train, data.Y_train, data.X_valid, data.Y_valid, data.y_valid)
+		preds5 = network5.predict(data.X_test)
+
+		test_accuracy = get_accuracy(preds1, preds2, preds3, preds4, preds5, data.y_test)
+		print 'Test accuracy: %f || Eta: %f || Lambda: %f' % (test_accuracy,eta,lmbd)
 
 if __name__ == "__main__":
     main()
