@@ -106,11 +106,12 @@ class NeuralNetwork:
 		self.b1 = np.zeros((self.NODES_IN_HIDDEN,1))
 		self.b2 = np.zeros((num_labels,1))
 
-		if init_mode == 1:
+		# Different initializations
+		if init_mode == 0:
 			self.W1 = np.random.normal(0,0.01,(self.NODES_IN_HIDDEN, data_dim))
 			self.W2 = np.random.normal(0,0.01,(num_labels, self.NODES_IN_HIDDEN))
 
-		if init_mode == 2:
+		if init_mode == 1:
 			self.W1 = np.zeros((self.NODES_IN_HIDDEN,data_dim))
 			for i in xrange(self.W1.shape[0]):
 				self.W1[i] = np.random.randn(self.W1.shape[1]) * math.sqrt(2.0/self.W1.shape[1])
@@ -119,7 +120,7 @@ class NeuralNetwork:
 			for i in xrange(self.W2.shape[0]):
 				self.W2[i] = np.random.randn(self.W2.shape[1]) * math.sqrt(2.0 / self.W2.shape[1])
 		
-		if init_mode == 3:
+		if init_mode == 2:
 			self.W1 = np.zeros((self.NODES_IN_HIDDEN,data_dim))
 			for i in xrange(self.W1.shape[0]):
 				self.W1[i] = np.random.randn(self.W1.shape[1]) / math.sqrt(self.W1.shape[1])
@@ -128,9 +129,13 @@ class NeuralNetwork:
 			for i in xrange(self.W2.shape[0]):
 				self.W2[i] = np.random.randn(self.W2.shape[1]) / math.sqrt(self.W2.shape[1])
 
-		if init_mode == 4:
+		if init_mode == 3:
 			self.W1 = np.random.normal(0,0.1,(self.NODES_IN_HIDDEN, data_dim))
 			self.W2 = np.random.normal(0,0.1,(num_labels, self.NODES_IN_HIDDEN))
+
+		if init_mode == 4:
+			self.W1 = np.random.normal(0,0.001,(self.NODES_IN_HIDDEN, data_dim))
+			self.W2 = np.random.normal(0,0.001,(num_labels, self.NODES_IN_HIDDEN))
 
 		# Momentum
 		self.W1_moment = np.zeros(self.W1.shape)
@@ -139,6 +144,7 @@ class NeuralNetwork:
 		self.b2_moment = np.zeros(self.b2.shape)
 
 		"""
+		Different adoptive learning rates
 		# Cache for Adagrad / RMSprop
 		self.W1_cache = np.zeros(self.W1.shape)
 		self.W2_cache = np.zeros(self.W2.shape)
@@ -183,14 +189,6 @@ class NeuralNetwork:
 		return P		
 	
 	def compute_cost(self,X,Y):
-		"""
-		scores_hidden = self.score_function(X,W1,b1)
-		hidden_layer = self.relu_activation(scores_hidden)
-
-		# TODO: convert to vectorized implementation
-		scores = self.score_function(hidden_layer,W2,b2)
-		P = self.softmax_probabilities(scores)
-		"""
 		P = self.get_model_probs(X)
 		cross_entropy = 0
 		for i in range(0,X.shape[1]):
@@ -247,9 +245,7 @@ class NeuralNetwork:
 
 		return gradW1,gradb1,gradW2,gradb2
 
-	def train(self,Xbatches,Ybatches,X_train,Y_train,X_valid,Y_valid, y_valid):
-		costs_train = []
-		costs_validation = []
+	def train(self,Xbatches,Ybatches):
 	
 		for epoch in xrange(self.N_EPOCHS):
 			for batch in xrange(len(Xbatches)):
@@ -284,6 +280,7 @@ class NeuralNetwork:
 				self.b2 -= self.b2_moment
 				
 				"""
+				## Different adaptive learning methods ##
 				# Adam 
 				self.W1_M = self.BETA1 * self.W1_M + (1 - self.BETA1) * gradW1
 				self.W1_V = self.BETA2 * self.W1_V + (1 - self.BETA2) * (gradW1**2)
@@ -324,19 +321,9 @@ class NeuralNetwork:
 				self.b2 += - self.ETA * gradb2 / (np.sqrt(self.b2_cache) + self.EPS)
 
 				"""
-			# Eta update
+			# Eta update for momentum
 			self.ETA = self.ETA * self.DECAY_RATE
-			#cost_train = self.compute_cost(X_train, Y_train)
-			#cost_validation = self.compute_cost(X_valid, Y_valid)
-			#validation_acc = self.compute_acc(y_valid,X_valid)
-			#print "Cost validation: %f" %cost_validation
-			#print "Cost train: %f" %cost_train
-			#print "Validation accuracy: " , validation_acc,  " %"
-			#print "Epoch" , epoch, "done..."
-			#costs_train.append(cost_train[0,0])
-			#costs_validation.append(cost_validation[0,0])
-
-		#plot_cost(costs_train,costs_validation)
+			print "Epoch", epoch, "done.."
 
 
 
@@ -379,10 +366,10 @@ def plot_cost(costs_train,costs_validation):
 	plt.ylabel('Loss')
 	plt.show()
 
-def get_accuracy(network1_pred, network2_pred, network3_pred, network4_pred, network5_pred, y):
+def get_accuracy(networks_predictions, y):
 
 	preds = np.zeros(y.shape)
-	ensamble = np.concatenate((network1_pred,network2_pred,network3_pred,network4_pred,network5_pred),axis=1)
+	ensamble = np.concatenate(networks_predictions,axis=1)
 
 	for i in xrange(preds.shape[0]):
 		v = ensamble[i].tolist()[0]
@@ -391,7 +378,6 @@ def get_accuracy(network1_pred, network2_pred, network3_pred, network4_pred, net
 		preds[i] = winning_vote
 
 	diff = preds - y
-	print diff.shape
 	num_correct = diff[diff == 0].shape[0]
 	num_tot = y.shape[0]
 	acc = num_correct / float(num_tot)
@@ -400,33 +386,22 @@ def get_accuracy(network1_pred, network2_pred, network3_pred, network4_pred, net
 def main():
 	data = DataLoader()
 
-	for i in range(1):
+	# Found during fine search with momentum update
+	eta = 0.030764
+	lmbd = 0.002238
+	
+	# Ensemble networks with different initializations
+	n_networks = 1
+	networks_predictions = []
 
-		eta = 0.030764
-		lmbd = 0.002238
-		
-		network1 = NeuralNetwork(data.X_train.shape[0], data.Y_train.shape[0], 1, eta, lmbd)
-		network1.train(data.Xbatches, data.Ybatches, data.X_train, data.Y_train, data.X_valid, data.Y_valid, data.y_valid)
-		preds1 = network1.predict(data.X_test)
+	for i in xrange(n_networks):
+		network = NeuralNetwork(data.X_train.shape[0], data.Y_train.shape[0], i, eta, lmbd)
+		network.train(data.Xbatches, data.Ybatches)
+		preds = network.predict(data.X_test)
+		networks_predictions.append(preds)
 
-		network2 = NeuralNetwork(data.X_train.shape[0], data.Y_train.shape[0], 2, eta, lmbd)
-		network2.train(data.Xbatches, data.Ybatches, data.X_train, data.Y_train, data.X_valid, data.Y_valid, data.y_valid)
-		preds2 = network2.predict(data.X_test)
-
-		network3 = NeuralNetwork(data.X_train.shape[0],data.Y_train.shape[0], 3, eta, lmbd)
-		network3.train(data.Xbatches, data.Ybatches, data.X_train, data.Y_train, data.X_valid, data.Y_valid, data.y_valid)
-		preds3 = network3.predict(data.X_test)
-
-		network4 = NeuralNetwork(data.X_train.shape[0], data.Y_train.shape[0], 4, eta, lmbd)
-		network1.train(data.Xbatches, data.Ybatches, data.X_train, data.Y_train, data.X_valid, data.Y_valid, data.y_valid)
-		preds4 = network4.predict(data.X_test)
-
-		network5 = NeuralNetwork(data.X_train.shape[0],data.Y_train.shape[0], 2, eta, lmbd)
-		network5.train(data.Xbatches, data.Ybatches, data.X_train, data.Y_train, data.X_valid, data.Y_valid, data.y_valid)
-		preds5 = network5.predict(data.X_test)
-
-		test_accuracy = get_accuracy(preds1, preds2, preds3, preds4, preds5, data.y_test)
-		print 'Test accuracy: %f || Eta: %f || Lambda: %f' % (test_accuracy,eta,lmbd)
+	test_accuracy = get_accuracy(networks_predictions, data.y_test)
+	print 'Test accuracy: %f || Eta: %f || Lambda: %f' % (test_accuracy,eta,lmbd)
 
 if __name__ == "__main__":
     main()
