@@ -83,7 +83,7 @@ class DataLoader:
 
 class NeuralNetwork:
 
-	N_EPOCHS = 30
+	N_EPOCHS = 10
 	
 	# Hyper-parameters
 	MU = 0.9
@@ -96,8 +96,9 @@ class NeuralNetwork:
 		self.ETA = eta
 
 		self.num_layers = num_layers
-		#np.random.seed(400)
 		
+		self.bn_params = {}
+
 		# Data dim
 		# How should I not hard code it since number of hidden nodes vary?...
 		self.biases_dims = []
@@ -145,7 +146,7 @@ class NeuralNetwork:
 		return preds
 
 	def compute_cost(self,X,Y):
-		P, _, _ = self.forward_pass(X)
+		P, _, _ , _= self.forward_pass(X)
 		cross_entropy = 0
 		for i in range(0,X.shape[1]):
 			y = Y[:,i]
@@ -202,28 +203,82 @@ class NeuralNetwork:
 
 		return grads_w[::-1], grads_b[::-1]
 
-	def forward_pass(self, X):
+	def forward_pass(self, X, mode='train'):
 		dot_products = []
 		hidden_layers = []
+		dot_products_bn = []
+		means = []
+		sigmas = []
 
-		# First hidden
-		first = self.score_function(X, self.weights[0], self.biases[0])
-		dot_products.append(first)
-		hidden_layers.append(self.relu_activation(first))
+		
+		alpha = 0.99
 
-		# Other hiddens
-		for layer in range(1, self.num_layers-1):
-			s = self.score_function(hidden_layers[layer - 1], self.weights[layer], self.biases[layer])
-			dot_products.append(s)
-			x = self.relu_activation(s)
-			hidden_layers.append(x)
+		for layer in range(0, self.num_layers-1):
+			if layer == 0:
+				s = self.score_function(X, self.weights[layer], self.biases[layer])
+				dot_products.append(s)
+					
+				if mode == "train":
+					# Calculate s_hat, means and vars
+					s_hat, mu, var = self.bn_forward(s)
+					means.append(mu)
+					sigmas.append(var)
+
+					# Update running mean and var
+				if mode == "test":
+					pass
+
+				dot_products_bn.append(s_hat)
+				hidden_layers.append(self.relu_activation(s_hat))
+			else:
+				s = self.score_function(hidden_layers[layer - 1], self.weights[layer], self.biases[layer])
+				dot_products.append(s)
+					
+				if mode == "train":
+					# Calculate s_hat, means and vars
+					s_hat, mu, var = self.bn_forward(s)
+					means.append(mu)
+					sigmas.append(var)
+
+					# Update running mean and var
+				if mode == "test":
+					pass
+
+				dot_products_bn.append(s_hat)
+				hidden_layers.append(self.relu_activation(s_hat))
 
 		# Final layer and softmax
 		scores_final = self.score_function(hidden_layers[-1], self.weights[-1], self.biases[-1])
 		dot_products.append(scores_final)
 		probs = self.softmax_probabilities(scores_final)
 
-		return probs, dot_products, hidden_layers
+		return probs, dot_products, dot_products_bn, hidden_layers
+
+	def bn_forward(self, s, running_mean=None, running_var=None):
+		eps = 1e-5
+	
+		# Mean and variance
+		mu = 1 / float(s.shape[1]) * np.sum(s,axis=1)
+		xmu = s - mu
+		carre = np.power(xmu,2)
+		var = 1 / float(s.shape[1]) * np.sum(carre, axis=1)
+		
+		# Normalized scores - train
+		if running_mean is None and running_var is None:
+			sqrtvar = np.sqrt(var + eps)
+			invvar = (1. / sqrtvar)
+			diag = np.diagflat(invvar)
+			s_hat = diag * xmu
+		# Normalized scores test
+		else: 
+			sqrtvar = np.sqrt(running_var + eps)
+			invvar = 1. / sqrtvar
+			diag = np.diagflat(invvar)
+			xmu = s - running_mean
+			s_hat = diag * xmu
+
+		return s_hat, mu, var
+
 
 	def train(self,Xbatches,Ybatches,X_train,Y_train, X_valid, Y_valid):
 	
@@ -231,13 +286,13 @@ class NeuralNetwork:
 			for batch in xrange(len(Xbatches)):
 				## Forward pass ##
 				
-				probs, dot_products, hidden_layers = self.forward_pass(Xbatches[batch])
+				probs, dot_products, dot_products_bn, hidden_layers = self.forward_pass(Xbatches[batch])
 
 				# Compute gradients and perform backprop
 				grads_w, grads_b = self.compute_gradients(Xbatches[batch], Ybatches[batch], probs, dot_products, hidden_layers)
 				
 				## Gradient check 
-				#grad_check_sparse(lambda _: self.compute_cost(Xbatches[batch], Ybatches[batch]), self.weights[0], grads_w[0], 1)
+				grad_check_sparse(lambda _: self.compute_cost(Xbatches[batch], Ybatches[batch]), self.weights[0], grads_w[0], 1)
 
 				# Momentum update
 				
