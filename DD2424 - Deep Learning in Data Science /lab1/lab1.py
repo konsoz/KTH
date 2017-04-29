@@ -247,6 +247,30 @@ def compute_gradients(X, Y, P, W,b):
 	gradW = gradW + 2*LAMBD*W  
 	return [gradW,gradb]
 
+def grad_check_sparse(f, x, analytic_grad, num_checks):
+  """
+  Adapted from: http://cs231n.github.io/neural-networks-case-study/ and http://cs231n.github.io/neural-networks-3/#gradcheck
+  sample a few random elements and only return numerical
+  in this dimensions.
+  """
+  h = 1e-5
+
+  x.shape
+  for i in xrange(num_checks):
+    ix = tuple([randrange(m) for m in x.shape])
+
+    oldval = x[ix]
+    x[ix] = oldval + h # increment by h
+    fxph = f(x) # evaluate f(x + h)
+    #print type(fxph), type(fxmh)
+    x[ix] = oldval - h # increment by h
+    fxmh = f(x) # evaluate f(x - h)
+    x[ix] = oldval # reset
+
+    grad_numerical = (fxph - fxmh) / (2 * h)
+    grad_analytic = analytic_grad[ix]
+    rel_error = abs(grad_numerical - grad_analytic) / (abs(grad_numerical) + abs(grad_analytic))
+    print 'numerical: %f analytic: %f, relative error: %e' % (grad_numerical, grad_analytic, rel_error)
 
 
 """
@@ -343,7 +367,6 @@ def train_svm():
 		for batch in range(0,len(X_batches)):
 			cost, dW = svm_cost(W,X_batches[batch],y_batches[batch])
 			W += - ETA * dW
-
 		cost_train, _ = svm_cost(W,X,y)
 		acc_train = compute_acc_svm(W,X,y)
 		print("Cost train: %f" %cost_train)
@@ -355,30 +378,6 @@ def train_svm():
 		costs_train.append(cost_train)
 		costs_validation.append(cost_validation)
 
-def grad_check_sparse(f, x, analytic_grad, num_checks):
-  """
-  Adapted from: http://cs231n.github.io/neural-networks-case-study/ and http://cs231n.github.io/neural-networks-3/#gradcheck
-  sample a few random elements and only return numerical
-  in this dimensions.
-  """
-  h = 1e-5
-
-  x.shape
-  for i in xrange(num_checks):
-    ix = tuple([randrange(m) for m in x.shape])
-
-    oldval = x[ix]
-    x[ix] = oldval + h # increment by h
-    fxph = f(x) # evaluate f(x + h)
-    #print type(fxph), type(fxmh)
-    x[ix] = oldval - h # increment by h
-    fxmh = f(x) # evaluate f(x - h)
-    x[ix] = oldval # reset
-
-    grad_numerical = (fxph - fxmh) / (2 * h)
-    grad_analytic = analytic_grad[ix]
-    rel_error = abs(grad_numerical - grad_analytic) / (abs(grad_numerical) + abs(grad_analytic))
-    print 'numerical: %f analytic: %f, relative error: %e' % (grad_numerical, grad_analytic, rel_error)
 
 def plot_cost(costs_train,costs_validation):
 	epochs_arr = np.arange(0, N_EPOCHS).tolist()
@@ -405,6 +404,6 @@ def plot_w(W):
 
 #train_svm()
 
-costs_validation,costs_train,W,b = train_softmax_reg()
+costs_validation,costs_train,W,b = train_svm()
 
 plot_w(W)

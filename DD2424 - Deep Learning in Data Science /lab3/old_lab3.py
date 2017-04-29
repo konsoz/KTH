@@ -3,7 +3,6 @@ import cPickle
 from random import randrange
 import matplotlib.pyplot as plt
 import math
-#from scipy.optimize import check_grad
 
 class DataLoader:
 
@@ -84,7 +83,7 @@ class DataLoader:
 
 class NeuralNetwork:
 
-	N_EPOCHS = 1
+	N_EPOCHS = 30
 	
 	# Hyper-parameters
 	MU = 0.9
@@ -104,11 +103,13 @@ class NeuralNetwork:
 		self.biases_dims = []
 		self.biases_dims.append((50,1))
 		self.biases_dims.append((30,1))
+		#self.biases_dims.append((50,1))
 		self.biases_dims.append((num_labels,1))
 
 		self.weights_dims = []
 		self.weights_dims.append((50,data_dim))
 		self.weights_dims.append((30,50))
+		#self.weights_dims.append((50,50))
 		self.weights_dims.append((num_labels,30))
 
 		self.biases = []
@@ -152,53 +153,54 @@ class NeuralNetwork:
 			ent = -np.log(y.T*p)
 			cross_entropy += ent
 		num_imgs = X.shape[1]
-		cost = (1/float(num_imgs)) * cross_entropy
+		cost = (1/float(num_imgs))* cross_entropy
 		for weight in self.weights:
 			cost += self.LAMBDA*np.sum(weight*weight)
-		return cost
+		return cost[0,0]
 
 
 	def compute_gradients(self, X, Y, P, dot_products, hidden_layers):
-		num_classes = Y.shape[0] 
-		data_dim = X.shape[0] 
 		num_imgs = X.shape[1]
 
 		grads_w = []
 		grads_b = []
-		
-		
-		for weight in self.weights:
-			grads_w.append(np.zeros(weight.shape))
-		
-		for bias in self.biases:			
-			grads_b.append(np.zeros(bias.shape))
-		
-		# Add input as first activation
+
+		dscores = (P - Y) / num_imgs
 		hidden_layers.insert(0,X)
-		
-		for i in xrange(num_imgs):
-			corresponding_softmax_probs = P[:,i]
-			diag_p = np.diagflat(corresponding_softmax_probs) 
-			g = -((Y[:,i] / (Y[:,i]*P[:,i])) * (diag_p-corresponding_softmax_probs*corresponding_softmax_probs.T))
-			k = self.num_layers - 1
-			while k >= 0:
-				grads_b[k] += g.T
-				g_w = g.T * hidden_layers[k][:,i].T + 2 * self.LAMBDA * self.weights[k]
-				grads_w[k] += g_w
-				if k > 0:
-					new_g = g * self.weights[k]
-					s = dot_products[k-1][:,i].T
+		i = self.num_layers - 1
+
+		while i >= 0:
+			# Gradient with respect to bias
+			# Some strange with numpy, sometimes I get an (N,) instead of (N,1)...
+			if i == self.num_layers - 1:
+				d_b = dscores.sum(axis=1)
+			else:
+				d_b = np.matrix(dscores.sum(axis=1)).T
+
+			# Gradeint with respect to weight
+			d_w = (dscores * hidden_layers[i].T)
+			d_w += 2 * self.LAMBDA * self.weights[i]
+			
+			grads_w.append(d_w)
+			grads_b.append(d_b)
+			
+			# Ugly backpropagation into hidden layer and relu 
+			# How to do this in matrix form?
+			if i > 0:
+				all_g = np.zeros((self.weights[i].shape[1],num_imgs)) 
+				for im in xrange(num_imgs):
+					g = np.matrix(dscores[:, [im]].T) * self.weights[i]
+					s = dot_products[i-1][:,im].T
 					s[s <= 0] = 0
 					s[s > 0] = 1
 					s = np.diagflat(s) 
-					g = new_g * s
-				k -= 1
+					g = g*s
+					all_g[:,im] = g
+				dscores = all_g
+			
+			i -= 1
 
-		grads_w = [grad_w / num_imgs for grad_w in grads_w]
-		grads_b = [grad_b / num_imgs for grad_b in grads_b]
-		
-		
-		return grads_w, grads_b
+		return grads_w[::-1], grads_b[::-1]
 
 	def forward_pass(self, X):
 		dot_products = []
@@ -223,7 +225,7 @@ class NeuralNetwork:
 
 		return probs, dot_products, hidden_layers
 
-	def train(self,Xbatches,Ybatches,X_train,Y_train):
+	def train(self,Xbatches,Ybatches,X_train,Y_train, X_valid, Y_valid):
 	
 		for epoch in xrange(self.N_EPOCHS):
 			for batch in xrange(len(Xbatches)):
@@ -233,13 +235,9 @@ class NeuralNetwork:
 
 				# Compute gradients and perform backprop
 				grads_w, grads_b = self.compute_gradients(Xbatches[batch], Ybatches[batch], probs, dot_products, hidden_layers)
-
+				
 				## Gradient check 
-				#grad_numerical = eval_numerical_gradient(lambda _: self.compute_cost(Xbatches[batch][0:50,:],Ybatches[batch], probs), self.weights[0][:,0:50], verbose=False)
-				#rel_error = abs(grad_numerical - grads_w[0][:,0:50]) / (abs(grad_numerical) + abs(grads_w[0][:,0:50]))
-				#print "Max relative error:", grad_numerical
-
-				grad_check_sparse(lambda W: self.compute_cost(Xbatches[batch], Ybatches[batch]), self.weights[2], grads_w[2], 1)
+				#grad_check_sparse(lambda _: self.compute_cost(Xbatches[batch], Ybatches[batch]), self.weights[0], grads_w[0], 1)
 
 				# Momentum update
 				
@@ -252,8 +250,10 @@ class NeuralNetwork:
 				
 			# Eta update for momentum
 			self.ETA = self.ETA * self.DECAY_RATE
-			train_cost = self.compute_cost(X_train, Y_train)
-			print "Cost train:", train_cost
+			#train_cost = self.compute_cost(X_train, Y_train)
+			validation_cost = self.compute_cost(X_train, Y_train)
+			#print "Cost train:", train_cost
+			print "Cost validation:", validation_cost
 			#print "Epoch", epoch, "done.."
 
 
@@ -280,7 +280,9 @@ def grad_check_sparse(f, x, analytic_grad, num_checks):
     grad_numerical = (fxph - fxmh) / (2 * h)
     grad_analytic = analytic_grad[ix]
     rel_error = abs(grad_numerical - grad_analytic) / (abs(grad_numerical) + abs(grad_analytic))
-    print 'numerical: %f analytic: %f, relative error: %e' % (grad_numerical, grad_analytic, rel_error)
+    # Sometimes rel_error becomes NaN when analytic and numerical gradient are 0
+    if not math.isnan(rel_error):
+    	print 'numerical: %f analytic: %f, relative error: %e' % (grad_numerical, grad_analytic, rel_error)
 
 
 def plot_cost(costs_train,costs_validation):
@@ -323,7 +325,7 @@ def main():
 
 	for i in xrange(n_networks):
 		network = NeuralNetwork(data.X_train.shape[0], data.Y_train.shape[0], i, 3, eta, lmbd)
-		network.train(data.Xbatches, data.Ybatches, data.X_train, data.Y_train)
+		network.train(data.Xbatches, data.Ybatches, data.X_train, data.Y_train, data.X_valid, data.Y_valid)
 		preds = network.predict(data.X_test)
 		networks_predictions.append(preds)
 
@@ -332,15 +334,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
-
-"""
-Notes :
-
-Eta range : 0.3 - 0.002
-Lambda range : 0.001 - 0.5 
-
-
-"""
