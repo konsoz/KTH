@@ -89,6 +89,8 @@ class NeuralNetwork:
 	MU = 0.9
 	DECAY_RATE = 0.95
 
+	EPS = 1e-5
+
 	def __init__(self,data_dim, num_labels, init_mode, num_layers, eta=0.1, lmbd=0):
 
 		# Hyper-parameters
@@ -97,7 +99,8 @@ class NeuralNetwork:
 
 		self.num_layers = num_layers
 		
-		self.bn_params = {}
+		self.running_var = {}
+		self.running_mean = {}
 
 		# Data dim
 		# How should I not hard code it since number of hidden nodes vary?...
@@ -141,12 +144,12 @@ class NeuralNetwork:
 		return (np.exp(scores) / np.sum(np.exp(scores), axis=0))
 
 	def predict(self,X):
-		P, _, _ = self.forward_pass(X)
+		P, _, _ , _, _, _= self.forward_pass(X)
 		preds = np.argmax(P,axis=0).T
 		return preds
 
-	def compute_cost(self,X,Y):
-		P, _, _ , _= self.forward_pass(X)
+	def compute_cost(self,X,Y, mode):
+		P, _, _ , _, _, _ = self.forward_pass(X, mode=mode)
 		cross_entropy = 0
 		for i in range(0,X.shape[1]):
 			y = Y[:,i]
@@ -160,48 +163,92 @@ class NeuralNetwork:
 		return cost[0,0]
 
 
-	def compute_gradients(self, X, Y, P, dot_products, hidden_layers):
+	def compute_gradients(self, X, Y, P, dot_products, dot_products_bn, hidden_layers, means, sigmas):
 		num_imgs = X.shape[1]
 
 		grads_w = []
 		grads_b = []
 
-		dscores = (P - Y) / num_imgs
-		hidden_layers.insert(0,X)
-		i = self.num_layers - 1
+		hidden_layers.insert(0, X)
+		i = self.num_layers - 2
+
+		# Last layer
+		G = (P - Y) / num_imgs
+		d_b = G.sum(axis=1)
+		d_w = G * hidden_layers[-1].T
+		d_w += 2 * self.LAMBDA * self.weights[-1]
+
+		grads_w.append(d_w)
+		grads_b.append(d_b)
+
+		all_g = np.zeros((self.weights[-1].shape[1],num_imgs)) 
+		for im in xrange(num_imgs):
+			g = np.matrix(G[:, [im]].T) * self.weights[-1]
+			s = dot_products_bn[-1][:,im].T
+			s[s <= 0] = 0
+			s[s > 0] = 1
+			s = np.diagflat(s) 
+			g = g*s
+			all_g[:,im] = g
+		G = all_g
 
 		while i >= 0:
-			# Gradient with respect to bias
-			# Some strange with numpy, sometimes I get an (N,) instead of (N,1)...
-			if i == self.num_layers - 1:
-				d_b = dscores.sum(axis=1)
-			else:
-				d_b = np.matrix(dscores.sum(axis=1)).T
-
-			# Gradeint with respect to weight
-			d_w = (dscores * hidden_layers[i].T)
+		
+			G = self.bn_backward(G, dot_products[i], sigmas[i], means[i])
+			d_b = np.matrix(G.sum(axis=1)).T
+			d_w = (G * hidden_layers[i].T)
 			d_w += 2 * self.LAMBDA * self.weights[i]
-			
-			grads_w.append(d_w)
-			grads_b.append(d_b)
+			grads_w.insert(0, d_w)
+			grads_b.insert(0, d_b)
 			
 			# Ugly backpropagation into hidden layer and relu 
 			# How to do this in matrix form?
 			if i > 0:
 				all_g = np.zeros((self.weights[i].shape[1],num_imgs)) 
 				for im in xrange(num_imgs):
-					g = np.matrix(dscores[:, [im]].T) * self.weights[i]
-					s = dot_products[i-1][:,im].T
+					g = np.matrix(G[:, [im]].T) * self.weights[i]
+					s = dot_products_bn[i-1][:,im].T
 					s[s <= 0] = 0
 					s[s > 0] = 1
 					s = np.diagflat(s) 
 					g = g*s
 					all_g[:,im] = g
-				dscores = all_g
+				G = all_g
 			
 			i -= 1
 
-		return grads_w[::-1], grads_b[::-1]
+		return grads_w, grads_b
+
+	def bn_backward(self, g, s, s_var, s_mean):
+		
+		# Need ndarrays insted of matrix...fix this in later time
+		h1 = np.asarray((s - s_mean).T)
+		sqrt_h2 = np.squeeze(np.asarray(np.sqrt(s_var + self.EPS)))
+		h2 = np.squeeze(np.asarray(1. / np.sqrt(s_var + self.EPS))) 
+		carre = h1**2
+		g = g.T
+		s_var = np.asarray(s_var)
+		
+		N = g.shape[0]
+
+		dh1 = h2 * g
+		dinvvar = np.sum(h1 * g, axis=0)
+
+		dsqrtvar = -1. / (sqrt_h2**2) * dinvvar
+
+		dvar = 0.5 * (s_var.T + self.EPS)**(-0.5) * dsqrtvar
+
+		dcarre = 1 / float(N) * np.ones((carre.shape)) * dvar
+
+		dh1 += 2 * h1 * dcarre
+
+		dx = dh1
+		dmu = - np.sum(dh1, axis=0)
+
+		dx += 1 / float(N) * np.ones((dh1.shape)) * dmu
+
+		return dx.T
+
 
 	def forward_pass(self, X, mode='train'):
 		dot_products = []
@@ -213,21 +260,35 @@ class NeuralNetwork:
 		
 		alpha = 0.99
 
-		for layer in range(0, self.num_layers-1):
+		for layer in range(0, self.num_layers - 1):
 			if layer == 0:
 				s = self.score_function(X, self.weights[layer], self.biases[layer])
 				dot_products.append(s)
-					
+			
 				if mode == "train":
 					# Calculate s_hat, means and vars
 					s_hat, mu, var = self.bn_forward(s)
+					
 					means.append(mu)
 					sigmas.append(var)
 
 					# Update running mean and var
-				if mode == "test":
-					pass
+					# Get running mean and var from train or initialize default from first run
+					running_mean = self.running_mean.get(layer, mu)
+					running_var = self.running_var.get(layer, var)
 
+					updated_mean = alpha * running_mean + (1 - alpha) * mu
+					updated_var = alpha * running_var + (1 - alpha) * var
+
+					self.running_mean[layer] = updated_mean
+					self.running_var[layer] = updated_var
+				
+				if mode == "test":
+					running_mean = self.running_mean.get(layer)
+					running_var = self.running_var.get(layer)
+
+					s_hat, _, _ = self.bn_forward(s, running_mean, running_var)
+				
 				dot_products_bn.append(s_hat)
 				hidden_layers.append(self.relu_activation(s_hat))
 			else:
@@ -241,44 +302,49 @@ class NeuralNetwork:
 					sigmas.append(var)
 
 					# Update running mean and var
-				if mode == "test":
-					pass
 
+					running_mean = self.running_mean.get(layer, mu)
+					running_var = self.running_var.get(layer, var)
+
+					updated_mean = alpha * running_mean + (1 - alpha) * mu
+					updated_var = alpha * running_var + (1 - alpha) * var
+
+					self.running_mean[layer] = updated_mean
+					self.running_var[layer] = updated_var
+				
+				if mode == "test":
+					running_mean = self.running_mean.get(layer)
+					running_var = self.running_var.get(layer)
+
+					s_hat, _, _ = self.bn_forward(s, running_mean, running_var)
+				
 				dot_products_bn.append(s_hat)
 				hidden_layers.append(self.relu_activation(s_hat))
 
 		# Final layer and softmax
 		scores_final = self.score_function(hidden_layers[-1], self.weights[-1], self.biases[-1])
-		dot_products.append(scores_final)
 		probs = self.softmax_probabilities(scores_final)
 
-		return probs, dot_products, dot_products_bn, hidden_layers
+		return probs, dot_products, dot_products_bn, hidden_layers, means, sigmas
 
 	def bn_forward(self, s, running_mean=None, running_var=None):
-		eps = 1e-5
-	
+
 		# Mean and variance
-		mu = 1 / float(s.shape[1]) * np.sum(s,axis=1)
-		xmu = s - mu
-		carre = np.power(xmu,2)
-		var = 1 / float(s.shape[1]) * np.sum(carre, axis=1)
-		
+		s_mean = s.mean(axis=1)
+		s_var = s.var(axis=1)
+
 		# Normalized scores - train
 		if running_mean is None and running_var is None:
-			sqrtvar = np.sqrt(var + eps)
-			invvar = (1. / sqrtvar)
-			diag = np.diagflat(invvar)
-			s_hat = diag * xmu
+			h1 = (s-s_mean)
+			h2 = np.sqrt(s_var+self.EPS)
+			s_hat = h1 / h2
 		# Normalized scores test
-		else: 
-			sqrtvar = np.sqrt(running_var + eps)
-			invvar = 1. / sqrtvar
-			diag = np.diagflat(invvar)
-			xmu = s - running_mean
-			s_hat = diag * xmu
-
-		return s_hat, mu, var
-
+		else:
+			h1 = (s-running_mean)
+			h2 = np.sqrt(running_var + self.EPS)
+			s_hat = h1 / h2
+			
+		return s_hat, s_mean, s_var
 
 	def train(self,Xbatches,Ybatches,X_train,Y_train, X_valid, Y_valid):
 	
@@ -286,13 +352,19 @@ class NeuralNetwork:
 			for batch in xrange(len(Xbatches)):
 				## Forward pass ##
 				
-				probs, dot_products, dot_products_bn, hidden_layers = self.forward_pass(Xbatches[batch])
+				probs, dot_products, dot_products_bn, hidden_layers, means, sigmas = self.forward_pass(Xbatches[batch])
+
+				#cost = self.compute_cost(Xbatches[batch], Ybatches[batch], 'train')
+
+				#print cost
 
 				# Compute gradients and perform backprop
-				grads_w, grads_b = self.compute_gradients(Xbatches[batch], Ybatches[batch], probs, dot_products, hidden_layers)
+				grads_w, grads_b = self.compute_gradients(Xbatches[batch], Ybatches[batch], 
+					probs, dot_products, dot_products_bn, hidden_layers, means, sigmas)
 				
 				## Gradient check 
-				grad_check_sparse(lambda _: self.compute_cost(Xbatches[batch], Ybatches[batch]), self.weights[0], grads_w[0], 1)
+				
+				#grad_check_sparse(lambda _: self.compute_cost(Xbatches[batch], Ybatches[batch], 'train'), self.weights[0], grads_w[0], 1)
 
 				# Momentum update
 				
@@ -306,7 +378,7 @@ class NeuralNetwork:
 			# Eta update for momentum
 			self.ETA = self.ETA * self.DECAY_RATE
 			#train_cost = self.compute_cost(X_train, Y_train)
-			validation_cost = self.compute_cost(X_train, Y_train)
+			validation_cost = self.compute_cost(X_train, Y_train, 'test')
 			#print "Cost train:", train_cost
 			print "Cost validation:", validation_cost
 			#print "Epoch", epoch, "done.."
