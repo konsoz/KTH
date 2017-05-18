@@ -1,0 +1,2 @@
+model_checkpoint_path: "/home/konstantin/Documents/KTH-git/DT2119 - Speech and Speaker Recognition/project/4hidden_256_allgenres.tfl"
+all_model_checkpoint_paths: "/home/konstantin/Documents/KTH-git/DT2119 - Speech and Speaker Recognition/project/4hidden_256_allgenres.tfl"
