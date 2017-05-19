@@ -1,5 +1,5 @@
 import numpy as np
-
+from random import uniform
 
 class DataLoader:
 
@@ -53,7 +53,10 @@ class RNN:
 		self.ada_b = np.zeros((hidden_dim, 1))
 		self.ada_c = np.zeros((self.output_size, 1))
 
-	def forward(self, h, x, y):
+	def forward(self, x, y):
+		# Access the previous state to calculate the current state
+		h = {}
+		h[-1] = np.copy(self.h)
 		p = {}
 		seq_length = len(x)
 		loss = 0
@@ -76,7 +79,7 @@ class RNN:
 			# cross-entropy loss
 			loss += -np.log(p[t][y[t], 0])
 
-		return loss, p
+		return loss, p, h
 
 	def backward(self, x, y, p, h):
 		# derivatives w.r.t different model params
@@ -92,61 +95,146 @@ class RNN:
 			y_t = np.zeros((self.input_size, 1))
 			y_t[y[t]] = 1
 
+			# One hot x
+			x_t = np.zeros((self.input_size, 1))
+			x_t[x[t]] = 1
+
 			# gradient w.r.t. o_t
 			g = - (y_t - p[t])
 
 			# gradient w.r.t. V and c
-			dW += np.dot(g, h[t].T)
+			dV += np.dot(g, h[t].T)
 			dc += g
 
-			# gradient w.r.t.
+			# gradient w.r.t. h, tanh nonlinearity
+			dh = (1 - h[t] ** 2) * (np.dot(self.V.T, g) + dh_next)
 
+			# gradient w.r.t. U
+			dU += np.dot(dh, x_t.T)
 
-		pass
+			# gradient w.r.t W
+			dW += np.dot(dh, h[t - 1].T)
+
+			# gradient w.r.t. b
+			db += dh
+
+			# Next (previous) dh
+			dh_next = np.dot(self.W.T, dh)
+
+		# clip to avoid exploding gradients
+		dW = np.clip(dW, -5, 5)
+		dU = np.clip(dU, -5, 5)
+		dV = np.clip(dV, -5, 5)
+		db = np.clip(db, -5, 5)
+		dc = np.clip(dc, -5, 5)
+
+		return dW, dU, dV, db, dc, h[len(x) - 1]
+
+	def adagrad_update(self, dW, dU, dV, db, dc):
+		# Update W
+		self.ada_W += dW * dW
+		self.W += - self.learning_rate * dW / np.sqrt(self.ada_W + 1e-8)
+
+		# Update U
+		self.ada_U += dU * dU
+		self.U += - self.learning_rate * dU / np.sqrt(self.ada_U + 1e-8)
+
+		# Update V
+		self.ada_V += dV * dV
+		self.V += - self.learning_rate * dV / np.sqrt(self.ada_V + 1e-8)
+
+		# Update c
+		self.ada_c += dc * dc
+		self.c += - self.learning_rate * dc / np.sqrt(self.ada_c + 1e-8)
+
+		# Update b
+		self.ada_b += db * db
+		self.b += - self.learning_rate * db / np.sqrt(self.ada_b + 1e-8)
 
 	def train(self, x, y):
-		# Access the previous state to calculate the current state
-		h = {}
-		h[-1] = np.copy(self.h)
-
-
-
-
 		# Forward pass
-		loss, p = self.forward(h, x, y)
-		self.backward(x, y, p, h)
+		loss, p, h = self.forward(x, y)
 
+		# Backward pass and adagrad update
+		dW, dU, dV, db, dc, h = self.backward(x, y, p, h)
+
+		# Grad check
+		self.grad_check([self.W, self.U, self.V, self.b, self.c], [dW, dU, dV, db, dc], x, y)
+
+		self.h = h
+
+		# Adagrad update
+		self.adagrad_update(dW, dU, dV, db, dc)
 
 		return loss
 
+	def sample(self, seed, n):
+		ndxs = []
+		h = self.h
+
+		xhat = np.zeros((self.input_size, 1))
+		xhat[seed] = 1  # transform to 1-of-k
+
+		for t in range(n):
+			h = np.tanh(np.dot(self.U, xhat) + np.dot(self.W, h) + self.b)  # update the state
+			y = np.dot(self.V, h) + self.c
+			p = np.exp(y) / np.sum(np.exp(y))
+			ndx = np.random.choice(range(self.input_size), p=p.ravel())
+
+			xhat = np.zeros((self.input_size, 1))
+			xhat[ndx] = 1
+
+			ndxs.append(ndx)
+
+		return ndxs
+
+	def grad_check(self, params, grads, x, y):
+		num_checks, delta = 10, 1e-5
+		for param, dparam in zip(params, grads):
+			s0 = dparam.shape
+			s1 = param.shape
+			assert s0 == s1, 'Error dims dont match: %s and %s.' % (`s0`, `s1`)
+			for i in xrange(num_checks):
+				ri = int(uniform(0, param.size))
+				old_val = param.flat[ri]
+				param.flat[ri] = old_val + delta
+				cg0, _, _ = self.forward(x, y)
+				param.flat[ri] = old_val - delta
+				cg1, _, _ = self.forward(x, y)
+				param.flat[ri] = old_val
+				grad_analytic = dparam.flat[ri]
+				grad_numerical = (cg0 - cg1) / (2 * delta)
+				rel_error = abs(grad_analytic - grad_numerical) / abs(grad_numerical + grad_analytic)
+				print '%f, %f => %e ' % (grad_numerical, grad_analytic, rel_error)
 
 def main():
 	data = DataLoader('goblet_book.txt')
 	input_size = len(data.uniq_chars)
 	output_size = len(data.uniq_chars)
-	np.random.seed(400)
 	rnn = RNN(100, 0.1, input_size, output_size)
 
 	seq_length = 25
 	losses = []
 	smooth_loss = -np.log(1.0/len(data.uniq_chars))*seq_length
 	losses.append(smooth_loss)
+	n_epochs = 5
 
-	for i in range(data.book_size/seq_length):
-		x = [data.char_to_ix[c] for c in data.book[i*seq_length:(i+1)*seq_length]]#inputs to the RNN
-		y = [data.char_to_ix[c] for c in data.book[i*seq_length+1:(i+1)*seq_length+1]]#the targets it should be outputting
+	for e in xrange(n_epochs):
+		for i in range(data.book_size/seq_length):
+			x = [data.char_to_ix[c] for c in data.book[i*seq_length:(i+1)*seq_length]]#inputs to the RNN
+			y = [data.char_to_ix[c] for c in data.book[i*seq_length+1:(i+1)*seq_length+1]]#the targets it should be outputting
 
-		#if i%1000==0:
-		#	sample_ix = rnn.sample(x[0], 200)
-		#	txt = ''.join([ix_to_char[n] for n in sample_ix])
-		#	print txt
+			if i%1000==0:
+				sample_ix = rnn.sample(x[0], 200)
+				txt = ''.join([data.ix_to_char[n] for n in sample_ix])
+				print txt
 
-		loss = rnn.train(x, y)
-		smooth_loss = smooth_loss*0.999 + loss*0.001
+			loss = rnn.train(x, y)
+			smooth_loss = smooth_loss*0.999 + loss*0.001
 
-		if i%1000==0:
-			print 'iteration %d, smooth_loss = %f' % (i, smooth_loss)
-			losses.append(smooth_loss)
+			if i%1000==0:
+				print 'iteration %d, smooth_loss = %f' % (i, smooth_loss)
+				losses.append(smooth_loss)
 
 
 if __name__ == "__main__":
