@@ -1,6 +1,6 @@
 import numpy as np
 from random import uniform
-
+import matplotlib.pyplot as plt
 class DataLoader:
 
 	def __init__(self, file_name):
@@ -155,12 +155,13 @@ class RNN:
 		# Forward pass
 		loss, p, h = self.forward(x, y)
 
-		# Backward pass and adagrad update
+		# Backward pass
 		dW, dU, dV, db, dc, h = self.backward(x, y, p, h)
 
 		# Grad check
-		self.grad_check([self.W, self.U, self.V, self.b, self.c], [dW, dU, dV, db, dc], x, y)
+		#self.grad_check([self.W, self.U, self.V, self.b, self.c], [dW, dU, dV, db, dc], x, y)
 
+		# Update hidden state
 		self.h = h
 
 		# Adagrad update
@@ -168,26 +169,37 @@ class RNN:
 
 		return loss
 
-	def sample(self, seed, n):
-		ndxs = []
+	def synthesize(self, first, n):
+		# sampled index t + 1th character in your sequence and will be the input vector for the next time-step of your RNN
+		synth_inds = []
+
+		# one hot x
+		x_t = np.zeros((self.input_size, 1))
+		x_t[first] = 1
+
 		h = self.h
-
-		xhat = np.zeros((self.input_size, 1))
-		xhat[seed] = 1  # transform to 1-of-k
-
 		for t in range(n):
-			h = np.tanh(np.dot(self.U, xhat) + np.dot(self.W, h) + self.b)  # update the state
+			# Forward pass
+			h = np.tanh(np.dot(self.U, x_t) + np.dot(self.W, h) + self.b)
 			y = np.dot(self.V, h) + self.c
 			p = np.exp(y) / np.sum(np.exp(y))
-			ndx = np.random.choice(range(self.input_size), p=p.ravel())
 
-			xhat = np.zeros((self.input_size, 1))
-			xhat[ndx] = 1
+			# Generate random index
+			cp = np.cumsum(p)
+			a = np.random.uniform()
+			cpa = cp - a
+			ixs = np.where(cpa > 0)
+			ii = ixs[0][0]
 
-			ndxs.append(ndx)
+			# take sampled index as an input to next sampling
+			x_t = np.zeros((self.input_size, 1))
+			x_t[ii] = 1
 
-		return ndxs
+			synth_inds.append(ii)
 
+		return synth_inds
+
+	# Gradient check, adopted from https://gist.github.com/karpathy/d4dee566867f8291f086#gistcomment-1508982
 	def grad_check(self, params, grads, x, y):
 		num_checks, delta = 10, 1e-5
 		for param, dparam in zip(params, grads):
@@ -220,21 +232,30 @@ def main():
 	n_epochs = 5
 
 	for e in xrange(n_epochs):
-		for i in range(data.book_size/seq_length):
-			x = [data.char_to_ix[c] for c in data.book[i*seq_length:(i+1)*seq_length]]#inputs to the RNN
-			y = [data.char_to_ix[c] for c in data.book[i*seq_length+1:(i+1)*seq_length+1]]#the targets it should be outputting
+		for i in range(data.book_size / seq_length):
+			x = [data.char_to_ix[c] for c in data.book[i * seq_length:(i + 1) * seq_length]]  # inputs to the RNN
+			y = [data.char_to_ix[c] for c in
+				 data.book[i * seq_length + 1:(i + 1) * seq_length + 1]]  # the targets it should be outputting
 
-			if i%1000==0:
-				sample_ix = rnn.sample(x[0], 200)
+			if i % 1000 == 0:
+				sample_ix = rnn.synthesize(x[0], 200)
 				txt = ''.join([data.ix_to_char[n] for n in sample_ix])
 				print txt
 
 			loss = rnn.train(x, y)
-			smooth_loss = smooth_loss*0.999 + loss*0.001
+			smooth_loss = smooth_loss * 0.999 + loss * 0.001
 
-			if i%1000==0:
+			if i % 1000 == 0:
 				print 'iteration %d, smooth_loss = %f' % (i, smooth_loss)
 				losses.append(smooth_loss)
+		# reset rnn memory after each epoch
+		rnn.h = np.zeros((100, 1))
+
+	plt.plot(range(len(losses)), losses, 'b', label='smooth loss')
+	plt.xlabel('time in thousands of iterations')
+	plt.ylabel('loss')
+	plt.legend()
+	plt.show()
 
 
 if __name__ == "__main__":
