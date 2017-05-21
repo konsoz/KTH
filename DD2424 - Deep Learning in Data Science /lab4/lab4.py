@@ -1,6 +1,8 @@
 import numpy as np
 from random import uniform
 import matplotlib.pyplot as plt
+import math
+
 class DataLoader:
 
 	def __init__(self, file_name):
@@ -128,7 +130,7 @@ class RNN:
 		db = np.clip(db, -5, 5)
 		dc = np.clip(dc, -5, 5)
 
-		return dW, dU, dV, db, dc, h[len(x) - 1]
+		return dW, dU, dV, db, dc, h[-1]
 
 	def adagrad_update(self, dW, dU, dV, db, dc):
 		# Update W
@@ -201,11 +203,12 @@ class RNN:
 
 	# Gradient check, adopted from https://gist.github.com/karpathy/d4dee566867f8291f086#gistcomment-1508982
 	def grad_check(self, params, grads, x, y):
-		num_checks, delta = 10, 1e-5
-		for param, dparam in zip(params, grads):
+		num_checks, delta = 10, 1e-4
+		for param, dparam, name in zip(params, grads, ['dW', 'dU', 'dV', 'db', 'dc']):
 			s0 = dparam.shape
 			s1 = param.shape
 			assert s0 == s1, 'Error dims dont match: %s and %s.' % (`s0`, `s1`)
+			print name
 			for i in xrange(num_checks):
 				ri = int(uniform(0, param.size))
 				old_val = param.flat[ri]
@@ -217,7 +220,8 @@ class RNN:
 				grad_analytic = dparam.flat[ri]
 				grad_numerical = (cg0 - cg1) / (2 * delta)
 				rel_error = abs(grad_analytic - grad_numerical) / abs(grad_numerical + grad_analytic)
-				print '%f, %f => %e ' % (grad_numerical, grad_analytic, rel_error)
+				if not math.isnan(rel_error):
+					print '%f, %f => %e ' % (grad_numerical, grad_analytic, rel_error)
 
 def main():
 	data = DataLoader('goblet_book.txt')
@@ -229,30 +233,47 @@ def main():
 	losses = []
 	smooth_loss = -np.log(1.0/len(data.uniq_chars))*seq_length
 	losses.append(smooth_loss)
-	n_epochs = 5
+	n_epochs = 10
+
+
+	best_rnn = rnn
+	lowest_loss = smooth_loss
 
 	for e in xrange(n_epochs):
 		for i in range(data.book_size / seq_length):
-			x = [data.char_to_ix[c] for c in data.book[i * seq_length:(i + 1) * seq_length]]  # inputs to the RNN
-			y = [data.char_to_ix[c] for c in
-				 data.book[i * seq_length + 1:(i + 1) * seq_length + 1]]  # the targets it should be outputting
+			# Input
+			x = [data.char_to_ix[c] for c in data.book[i * seq_length:(i + 1) * seq_length]]
+			# Output that should be predicted, i.e. next character
+			y = [data.char_to_ix[c] for c in data.book[i * seq_length + 1:(i + 1) * seq_length + 1]]
 
-			if i % 1000 == 0:
-				sample_ix = rnn.synthesize(x[0], 200)
-				txt = ''.join([data.ix_to_char[n] for n in sample_ix])
+			if i % 10000 == 0:
+				synth_sample = rnn.synthesize(x[0], 200)
+				txt = ''.join([data.ix_to_char[n] for n in synth_sample])
 				print txt
 
 			loss = rnn.train(x, y)
 			smooth_loss = smooth_loss * 0.999 + loss * 0.001
 
-			if i % 1000 == 0:
+			if i % 10000 == 0:
 				print 'iteration %d, smooth_loss = %f' % (i, smooth_loss)
 				losses.append(smooth_loss)
+
+			if smooth_loss < lowest_loss:
+				best_rnn = rnn
+				lowest_loss = smooth_loss
+
 		# reset rnn memory after each epoch
+		print 'Iteration ' + str(e) + 'done..'
 		rnn.h = np.zeros((100, 1))
 
+	synth_sample = best_rnn.synthesize(x[0], 1000)
+	txt = ''.join([data.ix_to_char[n] for n in synth_sample])
+	print lowest_loss
+	print txt
+
+
 	plt.plot(range(len(losses)), losses, 'b', label='smooth loss')
-	plt.xlabel('time in thousands of iterations')
+	plt.xlabel('Iterations, in thousands')
 	plt.ylabel('loss')
 	plt.legend()
 	plt.show()
